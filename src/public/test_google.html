@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Test Google Sign-In</title>
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
+  <style>body{font-family:Arial,Helvetica,sans-serif;padding:20px}</style>
+</head>
+<body>
+  <h2>Test Google Login</h2>
+  <p>Clique sur le bouton Google pour obtenir un idToken et l’envoyer à ton backend.</p>
+
+  <!-- initialization -->
+  <div id="g_id_onload"
+       data-client_id="482588772999-j4urfe2a8deablbsdckd6vaf80lmv9nn.apps.googleusercontent.com"
+       data-context="signin"
+       data-ux_mode="popup"
+       data-callback="handleCredentialResponse">
+  </div>
+
+  <!-- bouton Google -->
+  <div class="g_id_signin" data-type="standard"></div>
+
+  <pre id="output"></pre>
+
+  <script>
+    async function handleCredentialResponse(response) {
+      // response.credential contient l'idToken
+      console.log("ID Token Google:", response.credential);
+      document.getElementById('output').textContent = "ID Token (partiel) : " + response.credential.slice(0, 60) + "...";
+
+      try {
+        // Envoie au backend. Ajuste l'URL si nécessaire (ex: /api/auth/google)
+        const res = await fetch("/api/auth/google", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ idToken: response.credential })
+        });
+
+        const data = await res.json();
+        console.log("Réponse backend:", data);
+        document.getElementById('output').textContent += "\n\nRéponse backend:\n" + JSON.stringify(data, null, 2);
+      } catch (err) {
+        console.error("Erreur fetch:", err);
+        document.getElementById('output').textContent += "\n\nErreur fetch: " + err.message;
+      }
+    }
+  </script>
+</body>
+</html>
