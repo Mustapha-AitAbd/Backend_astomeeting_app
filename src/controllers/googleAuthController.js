@@ -1,9 +1,10 @@
+// controllers/googleAuthController.js
 const { OAuth2Client } = require('google-auth-library');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
 const User = require('../models/User');
 
-const client = new OAuth2Client();
+const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
 const signToken = (id) => jwt.sign({ id }, process.env.JWT_SECRET, { expiresIn: '7d' });
 
@@ -12,13 +13,13 @@ exports.googleSignIn = async (req, res) => {
     const { idToken } = req.body;
     if (!idToken) return res.status(400).json({ message: 'idToken is required' });
 
-    // Vérifier avec Google (support Web + iOS)
     const ticket = await client.verifyIdToken({
       idToken,
       audience: [
-        process.env.GOOGLE_CLIENT_ID,     // Web client
-        process.env.GOOGLE_IOS_CLIENT_ID  // iOS client
-      ]
+        process.env.GOOGLE_CLIENT_ID,
+        process.env.GOOGLE_IOS_CLIENT_ID,
+        process.env.GOOGLE_ANDROID_CLIENT_ID
+      ].filter(Boolean)
     });
 
     const payload = ticket.getPayload();
@@ -27,7 +28,6 @@ exports.googleSignIn = async (req, res) => {
     let user = await User.findOne({ $or: [{ googleId }, { email }] });
 
     if (!user) {
-      // générer un password aléatoire car password requis par schema
       const randomPassword = await bcrypt.hash(googleId + process.env.JWT_SECRET, 10);
 
       user = await User.create({
@@ -45,13 +45,7 @@ exports.googleSignIn = async (req, res) => {
 
     res.json({
       token,
-      user: {
-        id: user._id,
-        name: user.name,
-        email: user.email,
-        avatar: user.avatar,
-        provider: user.provider
-      }
+      user: { id: user._id, name: user.name, email: user.email, avatar: user.avatar, provider: user.provider }
     });
   } catch (err) {
     console.error('Google sign-in error:', err);
