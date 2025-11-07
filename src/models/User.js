@@ -44,7 +44,14 @@ const UserSchema = new mongoose.Schema({
 
   // 🔑 Fields for password reset via email code
   resetPasswordCode: { type: String },
-  resetPasswordExpires: { type: Date }
+  resetPasswordExpires: { type: Date },
+
+  subscription: {
+    plan: { type: String, enum: ['free', 'premium', 'pro'], default: 'free' },
+    active: { type: Boolean, default: false },
+    expiresAt: { type: Date },
+    stripeCustomerId: { type: String }, // optionnel si tu veux rattacher customer
+  },
 });
 
 // Geospatial index

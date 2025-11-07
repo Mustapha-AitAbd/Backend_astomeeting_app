@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <title>Test Paiement Stripe</title>
+  <script src="https://js.stripe.com/v3/"></script>
+</head>
+<body style="font-family: Arial; text-align: center; margin-top: 100px;">
+  <h2>Test du paiement Stripe</h2>
+  <p>Clique sur le bouton ci-dessous pour tester un paiement de 5 €.</p>
+  <button id="checkout-button" style="padding: 10px 20px; font-size: 16px;">Payer maintenant</button>
+
+  <script>
+    // ⚠️ Remplace par ta clé publique trouvée sur ton dashboard Stripe (ex: pk_test_51Nxxxxx)
+    const stripe = Stripe("pk_test_12345");
+
+    document.getElementById("checkout-button").addEventListener("click", async () => {
+      const response = await fetch("http://localhost:5000/api/payment/create-checkout-session", {
+        method: "POST",
+      });
+
+      const session = await response.json();
+
+      if (session.url) {
+        // Redirection vers Stripe Checkout
+        window.location.href = session.url;
+      } else {
+        alert("Erreur Stripe : " + (session.error || "Impossible de créer la session."));
+      }
+    });
+  </script>
+</body>
+</html>
