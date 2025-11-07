@@ -1,15 +1,16 @@
+// src/config/db.js
 const mongoose = require('mongoose');
 
 const connectDB = async () => {
   try {
+    // Connexion simple à MongoDB (les options sont déjà intégrées par défaut)
     await mongoose.connect(process.env.MONGO_URI, {
-      useNewUrlParser: true,
-      useUnifiedTopology: true,
-      dbName: "MATCHMAKING"   // Nom explicite de la DB
+      dbName: "MATCHMAKING", // Nom de ta base de données
     });
-    console.log('MongoDB connected to MATCHMAKING database ✅');
+
+    console.log('✅ MongoDB connected to MATCHMAKING database');
   } catch (err) {
-    console.error('MongoDB connection error:', err);
+    console.error('❌ MongoDB connection error:', err.message);
     process.exit(1);
   }
 };
