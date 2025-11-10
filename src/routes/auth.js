@@ -1,6 +1,8 @@
 // src/routes/auth.js
 const express = require('express');
+const User = require('../models/User');
 const router = express.Router();
+const verifyToken = require('../middlewares/auth'); // <-- note bien le chemin
 const { protect } = require('../middlewares/authMiddleware');
 const { sendPhoneVerificationCode, verifyPhoneCode } = require('../controllers/userController');
 const {
@@ -21,6 +23,15 @@ router.post('/register', register);
 
 // Login
 router.post('/login', login);
+router.get('/me', verifyToken, (req, res) => {
+  try {
+    // Ici req.user est déjà le user récupéré par le middleware
+    if (!req.user) return res.status(404).json({ message: 'Utilisateur non trouvé' });
+    res.json(req.user);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
 
 // Logout
 router.post('/logout', isTokenValid, logout);
