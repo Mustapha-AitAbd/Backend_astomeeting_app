@@ -5,27 +5,29 @@ const twilio = require('twilio')(process.env.TWILIO_SID, process.env.TWILIO_AUTH
 
 
 
-// Récupérer le profil de l'utilisateur connecté
-exports.getMe = async (req, res, next) => {
+
+
+// 📌 Récupérer les infos complètes de l'utilisateur connecté
+exports.getMe = async (req, res) => {
   try {
-    const user = req.user;
-    res.json({
-      id: user._id,
-      name: user.name,
-      email: user.email,
-      gender: user.gender,
-      dateOfBirth: user.dateOfBirth,
-      bio: user.bio,
-      photos: user.photos,
-      preference: user.preference,
-      location: user.location,
-      createdAt: user.createdAt,
-      lastActive: user.lastActive
+    // Récupère l'utilisateur connecté depuis le token (middleware auth)
+    const user = await User.findById(req.user.id).select('-password -__v');
+
+    if (!user) {
+      return res.status(404).json({ message: 'Utilisateur non trouvé' });
+    }
+
+    // Retourne toutes les infos, y compris subscription
+    res.status(200).json({
+      success: true,
+      data: user
     });
   } catch (err) {
-    next(err);
+    console.error('Erreur getMe:', err);
+    res.status(500).json({ message: 'Erreur serveur' });
   }
 };
+
 
 // Mettre à jour le profil de l'utilisateur connecté
 exports.updateMe = async (req, res, next) => {

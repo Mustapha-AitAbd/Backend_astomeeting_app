@@ -1,11 +1,9 @@
+// routes/paymentRoutes.js
 const express = require('express');
 const router = express.Router();
 const { createCheckoutSession, handleWebhook } = require('../controllers/paymentController');
+const auth = require('../middlewares/auth');
 
-// ⚠️ Stripe webhook doit utiliser le raw body
-router.post('/webhook', express.raw({ type: 'application/json' }), handleWebhook);
-
-// Route pour créer la session Stripe
-router.post('/create-checkout-session', createCheckoutSession);
+router.post('/create-checkout-session', auth, createCheckoutSession);
 
 module.exports = router;

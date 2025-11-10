@@ -5,6 +5,7 @@ const cors = require('cors');
 const morgan = require('morgan');
 const path = require('path');
 const chatRoutes = require("./routes/chatRoutes");
+const paymentRouter = require('./controllers/paymentController');
 
 
 // === Connexion MongoDB ===
@@ -12,8 +13,12 @@ connectDB();
 
 const app = express();
 
-// ⚠️ Stripe webhook avant express.json()
-app.use('/api/payment/webhook', express.raw({ type: 'application/json' }));
+// ⚠️ IMPORTANT : Déclarer le webhook AVANT express.json()
+app.post(
+  '/api/payment/webhook',
+  express.raw({ type: 'application/json' }), // corps brut requis par Stripe
+  require('./controllers/paymentController').handleWebhook
+);
 
 // === Middlewares globaux ===
 app.use(cors());
@@ -44,6 +49,8 @@ app.get('/test-google', (req, res) => {
 app.get('/test-stripe', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'test_stripe.html'));
 });
+
+
 
 
 // === Middleware de gestion des erreurs ===
