@@ -1,7 +1,7 @@
 const Conversation = require("../models/Conversation");
 const Message = require("../models/Message");
 
-// ✅ Créer une conversation (si elle n'existe pas déjà)
+// ✅ Create a conversation (if it doesn't already exist)
 exports.createConversation = async (req, res) => {
   try {
     const { senderId, receiverId } = req.body;
@@ -21,7 +21,7 @@ exports.createConversation = async (req, res) => {
   }
 };
 
-// ✅ Récupérer toutes les conversations d'un utilisateur
+// ✅ Retrieve all conversations of a user
 exports.getConversations = async (req, res) => {
   try {
     const conversations = await Conversation.find({
@@ -33,7 +33,7 @@ exports.getConversations = async (req, res) => {
   }
 };
 
-// saveMessage (inchangé)
+// saveMessage (unchanged)
 exports.saveMessage = async ({ conversationId, senderId, receiverId, text }) => {
   const message = new Message({ conversationId, sender: senderId, receiver: receiverId, text });
   await message.save();
@@ -41,7 +41,7 @@ exports.saveMessage = async ({ conversationId, senderId, receiverId, text }) => 
   return message;
 };
 
-// sendMessage via REST - émet aussi l'événement si io est disponible
+// sendMessage via REST - also emits the event if io is available
 exports.sendMessage = async (req, res) => {
   try {
     const { conversationId, senderId, receiverId, text } = req.body;
@@ -58,7 +58,7 @@ exports.sendMessage = async (req, res) => {
   }
 };
 
-// ✅ Récupérer tous les messages d'une conversation
+// ✅ Retrieve all messages from a conversation
 exports.getMessages = async (req, res) => {
   try {
     const messages = await Message.find({ conversationId: req.params.conversationId });
@@ -68,7 +68,7 @@ exports.getMessages = async (req, res) => {
   }
 };
 
-// ✅ Mettre à jour le statut d'un message (ex: lu)
+// ✅ Update the status of a message (e.g., read)
 exports.updateMessageStatus = async (req, res) => {
   try {
     const { messageId, status } = req.body;

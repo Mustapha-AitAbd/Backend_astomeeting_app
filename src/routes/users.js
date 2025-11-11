@@ -1,17 +1,16 @@
 // src/routes/users.js
 const express = require('express');
 const router = express.Router();
-const auth = require('../middlewares/auth');
 const { getMe, updateMe, getNearbyUsers } = require('../controllers/userController');
 const auth = require('../middlewares/auth');
-const { getMe } = require('../controllers/userController');
 
+// Get  user's profile
 router.get('/me', getMe);
 
-// Mise à jour du profil
-router.put('/me', auth, updateMe);
+// Profile update
+router.put('/me', updateMe);
 
-// Rechercher des utilisateurs proches
-router.get('/nearby', auth, getNearbyUsers);
+// Search for nearby users
+router.get('/nearby', getNearbyUsers);
 
 module.exports = router;
