@@ -7,7 +7,7 @@ const Conversation = require("./models/Conversation");
 
 const PORT = process.env.PORT || 5000;
 
-// Crée serveur HTTP à partir de Express
+// Create an HTTP server using Express
 const server = http.createServer(app);
 
 // Attache Socket.IO
@@ -18,10 +18,10 @@ const io = new Server(server, {
   },
 });
 
-// Expose io aux controllers
+// Expose io to controllers
 app.set("io", io);
 
-// Gestion Socket.IO
+// Socket.IO management
 io.on("connection", (socket) => {
   console.log("🔌 Socket connecté:", socket.id);
 
@@ -47,7 +47,7 @@ io.on("connection", (socket) => {
 
       io.to(String(message.conversationId)).emit("newMessage", message);
     } catch (err) {
-      console.error("Erreur socket sendMessage:", err.message);
+      console.error("socket sendMessage error:", err.message);
     }
   });
 
@@ -56,12 +56,12 @@ io.on("connection", (socket) => {
       const updated = await Message.findByIdAndUpdate(messageId, { status: "read" }, { new: true });
       if (updated) io.to(String(conversationId)).emit("messageUpdated", updated);
     } catch (err) {
-      console.error("Erreur messageRead:", err.message);
+      console.error("error messageRead:", err.message);
     }
   });
 
   socket.on("disconnect", () => {
-    console.log("❌ Socket déconnecté:", socket.id);
+    console.log("❌ Socket disconnected:", socket.id);
   });
 });
 

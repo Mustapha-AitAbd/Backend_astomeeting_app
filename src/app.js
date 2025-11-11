@@ -8,44 +8,44 @@ const chatRoutes = require("./routes/chatRoutes");
 const paymentRouter = require('./controllers/paymentController');
 
 
-// === Connexion MongoDB ===
+// === MongoDB Connection ===
 connectDB();
 
 const app = express();
 
-// ⚠️ IMPORTANT : Déclarer le webhook AVANT express.json()
+// ⚠️ IMPORTANT : DDeclare the webhook BEFORE express.json()
 app.post(
   '/api/payment/webhook',
-  express.raw({ type: 'application/json' }), // corps brut requis par Stripe
+  express.raw({ type: 'application/json' }), // raw body required by Stripe
   require('./controllers/paymentController').handleWebhook
 );
 
-// === Middlewares globaux ===
+// === Global middlewares ===
 app.use(cors());
 app.use(morgan('dev'));
 app.use(express.json());
 
-// === Routes principales ===
+// === Main routes ===
 app.use('/api/auth', require('./routes/auth'));
 app.use('/api/users', require('./routes/users'));
 app.use("/api/chat", chatRoutes);
 
-// ✅ Ajout des routes Stripe
+// ✅ Add Stripe routes
 app.use('/api/payment', require('./routes/paymentRoutes'));
 
-// ✅ Ajout de la route premium protégée
+// ✅ Add protected premium route
 app.use('/api/premium', require('./routes/premium'));
 
 
 
-// === Fichiers statiques ===
+// === Static files ===
 app.use(express.static(path.join(__dirname, 'public')));
 
 app.get('/test-google', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'test_google.html'));
 });
 
-// Route pour tester Stripe
+// Route to test Stripe
 app.get('/test-stripe', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'test_stripe.html'));
 });
@@ -53,7 +53,7 @@ app.get('/test-stripe', (req, res) => {
 
 
 
-// === Middleware de gestion des erreurs ===
+// === Error handling middleware ===
 app.use((err, req, res, next) => {
   console.error('Erreur serveur :', err);
   res.status(500).json({ message: err.message || 'Erreur serveur interne' });

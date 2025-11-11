@@ -7,7 +7,7 @@ exports.swipe = async (req, res, next) => {
     const swiperId = req.user._id;
     const { targetId, action } = req.body;
 
-    // enregistrer swipe (unique par paire)
+    // save swipe (unique per pair)
     const swipe = await Swipe.findOneAndUpdate(
       { swiper: swiperId, target: targetId },
       { action },
@@ -15,14 +15,14 @@ exports.swipe = async (req, res, next) => {
     );
 
     if (action === 'like') {
-      // vérifier si target a déjà liké swiper
+      // check if target has already liked swiper
       const reciprocal = await Swipe.findOne({ swiper: targetId, target: swiperId, action: 'like' });
       if (reciprocal) {
-        // créer match si n'existe pas
+        // create match if not existing
         let match = await Match.findOne({ users: { $all: [swiperId, targetId] } });
         if (!match) {
           match = await Match.create({ users: [swiperId, targetId] });
-          // TODO: notifier via socket.io / push notification
+          // TODO: notify via socket.io / push notification
         }
         return res.json({ swipe, match, matched: true });
       }

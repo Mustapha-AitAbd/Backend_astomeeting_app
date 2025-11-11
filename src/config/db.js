@@ -3,9 +3,9 @@ const mongoose = require('mongoose');
 
 const connectDB = async () => {
   try {
-    // Connexion simple à MongoDB (les options sont déjà intégrées par défaut)
+    
     await mongoose.connect(process.env.MONGO_URI, {
-      dbName: "MATCHMAKING", // Nom de ta base de données
+      dbName: "MATCHMAKING", 
     });
 
     console.log('✅ MongoDB connected to MATCHMAKING database');

@@ -9,9 +9,9 @@ exports.protect = (req, res, next) => {
 
     const token = authHeader.split(' ')[1];
 
-    // Vérifie si token est blacklisté
+    
     if (isTokenValid && typeof isTokenValid === 'function') {
-      isTokenValid(req, res, () => {}); // vérifie invalidation
+      isTokenValid(req, res, () => {}); 
     }
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET);

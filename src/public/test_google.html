@@ -8,11 +8,11 @@
 </head>
 <body>
   <h2>Test Google Login</h2>
-  <p>Clique sur le bouton Google pour obtenir un idToken et l’envoyer à ton backend.</p>
+  <p>Click on the Google button to get an idToken and send it to your backend.</p>
 
   <!-- initialization -->
   <div id="g_id_onload"
-       data-client_id="482588772999-j4urfe2a8deablbsdckd6vaf80lmv9nn.apps.googleusercontent.com"
+       data-client_id="258877299-4lmv9nn.apps.googleusercontent.com"
        data-context="signin"
        data-ux_mode="popup"
        data-callback="handleCredentialResponse">
@@ -25,12 +25,12 @@
 
   <script>
     async function handleCredentialResponse(response) {
-      // response.credential contient l'idToken
-      console.log("ID Token Google:", response.credential);
-      document.getElementById('output').textContent = "ID Token (partiel) : " + response.credential.slice(0, 60) + "...";
+      
+      console.log("Google ID Token:", response.credential);
+      document.getElementById('output').textContent = "ID Token (partial) : " + response.credential.slice(0, 60) + "...";
 
       try {
-        // Envoie au backend. Ajuste l'URL si nécessaire (ex: /api/auth/google)
+       
         const res = await fetch("/api/auth/google", {
           method: "POST",
           headers: { "Content-Type": "application/json" },

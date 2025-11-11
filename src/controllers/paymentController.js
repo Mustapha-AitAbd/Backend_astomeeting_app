@@ -4,22 +4,22 @@ const User = require('../models/User');
 const stripe = Stripe(process.env.STRIPE_SECRET_KEY);
 
 // ================================
-// 1️⃣ Création d'une session de paiement
+// 1️⃣ Creating a payment session
 // ================================
 exports.createCheckoutSession = async (req, res) => {
   try {
     const { email } = req.body;
 
     if (!email) {
-      return res.status(400).json({ error: "Email est requis" });
+      return res.status(400).json({ error: "Email is required" });
     }
 
     const user = await User.findOne({ email: email.toLowerCase() });
     if (!user) {
-      return res.status(404).json({ error: "Utilisateur non trouvé" });
+      return res.status(404).json({ error: "User not found" });
     }
 
-    // Crée un client Stripe si non existant
+    // Create a Stripe customer if not existing
     let customerId = user.subscription.stripeCustomerId;
     if (!customerId) {
       const customer = await stripe.customers.create({
@@ -32,7 +32,7 @@ exports.createCheckoutSession = async (req, res) => {
       await user.save();
     }
 
-    // Crée la session de paiement
+    // Create the payment session
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ['card'],
       mode: 'payment',
@@ -42,8 +42,8 @@ exports.createCheckoutSession = async (req, res) => {
           price_data: {
             currency: 'eur',
             product_data: {
-              name: 'Abonnement Premium',
-              description: 'Accès illimité pendant 30 jours',
+              name: 'Premium Subscription',
+              description: 'Unlimited access for 30 days',
             },
             unit_amount: 500, // 5,00 €
           },
@@ -57,13 +57,13 @@ exports.createCheckoutSession = async (req, res) => {
 
     res.json({ url: session.url });
   } catch (error) {
-    console.error('Erreur création session Stripe:', error.message);
+    console.error('Error creating Stripe session:', error.message);
     res.status(400).json({ error: error.message });
   }
 };
 
 // ================================
-// 2️⃣ Webhook Stripe — Confirmation de paiement
+// 2️⃣ Stripe Webhook - Payment Confirmation
 // controllers/paymentController.js
 exports.handleWebhook = async (req, res) => {
   const sig = req.headers['stripe-signature'];
@@ -72,13 +72,13 @@ exports.handleWebhook = async (req, res) => {
   try {
     event = stripe.webhooks.constructEvent(req.body, sig, process.env.STRIPE_WEBHOOK_SECRET);
   } catch (err) {
-    console.error('Erreur Webhook Stripe:', err.message);
+    console.error('Stripe Webhook Error:', err.message);
     return res.status(400).send(`Webhook Error: ${err.message}`);
   }
 
   if (event.type === 'checkout.session.completed') {
     const session = event.data.object;
-    console.log('✅ Session Stripe:', session);
+    console.log('✅ Stripe Session:', session);
 
     const email = session.metadata?.email;
     console.log('Email metadata:', email);
@@ -94,9 +94,9 @@ exports.handleWebhook = async (req, res) => {
         user.subscription.expiresAt = expiresAt;
 
         await user.save();
-        console.log(`✅ Utilisateur ${user.email} est maintenant PREMIUM jusqu'au ${expiresAt}`);
+        console.log(`✅User ${user.email} is now PREMIUM until ${expiresAt}`);
       } else {
-        console.error(`⚠️ Utilisateur non trouvé pour email ${email}`);
+        console.error(`⚠️ User not found for email ${email}`);
       }
     }
   }

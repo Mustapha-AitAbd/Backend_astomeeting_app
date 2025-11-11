@@ -7,33 +7,33 @@ const twilio = require('twilio')(process.env.TWILIO_SID, process.env.TWILIO_AUTH
 
 
 
-// 📌 Récupérer les infos complètes de l'utilisateur connecté
+// 📌 Retrieve the complete information of the logged-in user.
 exports.getMe = async (req, res) => {
   try {
-    // Récupère l'utilisateur connecté depuis le token (middleware auth)
+    // Retrieve the logged-in user from the token (auth middleware)
     const user = await User.findById(req.user.id).select('-password -__v');
 
     if (!user) {
       return res.status(404).json({ message: 'Utilisateur non trouvé' });
     }
 
-    // Retourne toutes les infos, y compris subscription
+   // Returns all information, including subscription
     res.status(200).json({
       success: true,
       data: user
     });
   } catch (err) {
-    console.error('Erreur getMe:', err);
-    res.status(500).json({ message: 'Erreur serveur' });
+    console.error('Error getMe:', err);
+    res.status(500).json({ message: 'Server error' });
   }
 };
 
 
-// Mettre à jour le profil de l'utilisateur connecté
+// Update the logged-in user's profile
 exports.updateMe = async (req, res, next) => {
   try {
     const updates = req.body;
-    // Interdire update de certains champs sensibles
+    // Disallow updating certain sensitive fields
     delete updates.password;
     delete updates.email;
 
@@ -58,7 +58,7 @@ exports.updateMe = async (req, res, next) => {
   }
 };
 
-// Rechercher des utilisateurs proches selon la géolocalisation et les préférences
+// Search for nearby users based on geolocation and preferences
 exports.getNearbyUsers = async (req, res, next) => {
   try {
     const { lat, lng, maxKm } = req.query;
@@ -66,10 +66,10 @@ exports.getNearbyUsers = async (req, res, next) => {
       return res.status(400).json({ message: 'Latitude and longitude are required' });
     }
 
-    const maxDistance = (maxKm || 50) * 1000; // convertir km -> m
+    const maxDistance = (maxKm || 50) * 1000; 
 
     const nearbyUsers = await User.find({
-      _id: { $ne: req.user._id }, // exclure l'utilisateur connecté
+      _id: { $ne: req.user._id }, 
       location: {
         $near: {
           $geometry: { type: 'Point', coordinates: [parseFloat(lng), parseFloat(lat)] },
@@ -77,8 +77,8 @@ exports.getNearbyUsers = async (req, res, next) => {
         }
       }
     })
-    .limit(50) // limiter le nombre d'utilisateurs retournés
-    .select('-password -email'); // ne pas renvoyer le password
+    .limit(50) // limit the number of users returned
+    .select('-password -email'); 
 
     res.json(nearbyUsers);
   } catch (err) {
@@ -87,7 +87,7 @@ exports.getNearbyUsers = async (req, res, next) => {
 };
 
 
-// 📌 Étape 1 : Envoi du code par SMS via Twilio
+// 📌 Step 1: Send verification code via SMS using Twilio
 exports.sendPhoneVerificationCode = async (req, res, next) => {
   try {
     const { email, phone } = req.body;
@@ -95,10 +95,10 @@ exports.sendPhoneVerificationCode = async (req, res, next) => {
       return res.status(400).json({ message: 'Email and phone are required' });
     }
 
-    // Générer un code aléatoire à 6 chiffres
+    // Generate a random 6-digit code
     const code = crypto.randomInt(100000, 999999).toString();
 
-    // Sauvegarder dans MongoDB avec expiration 5 min
+    // Save in MongoDB with 5 min expiration
     const user = await User.findOneAndUpdate(
       { email },
       {
@@ -113,10 +113,10 @@ exports.sendPhoneVerificationCode = async (req, res, next) => {
       return res.status(404).json({ message: 'User not found with this email' });
     }
 
-    // Envoyer par SMS via Twilio
+    // Send via SMS using Twilio
     await twilio.messages.create({
-      body: `Votre code de vérification est : ${code}`,
-      from: process.env.TWILIO_PHONE, // numéro Twilio configuré
+      body: `Your verification code is : ${code}`,
+      from: process.env.TWILIO_PHONE, // Twilio configured number
       to: phone
     });
 
@@ -126,7 +126,7 @@ exports.sendPhoneVerificationCode = async (req, res, next) => {
   }
 };
 
-// 📌 Étape 2 : Vérification du code
+// 📌 Step 2: Code verification
 exports.verifyPhoneCode = async (req, res, next) => {
   try {
     const { email, code } = req.body;
@@ -145,7 +145,7 @@ exports.verifyPhoneCode = async (req, res, next) => {
       return res.status(400).json({ message: 'Invalid or expired code' });
     }
 
-    // ✅ Validation OK → activer le numéro
+    // ✅ Validation OK → activate the phone number
     user.phoneVerified = true;
     user.phoneVerificationCode = undefined;
     user.phoneVerificationExpires = undefined;
