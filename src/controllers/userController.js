@@ -156,3 +156,50 @@ exports.verifyPhoneCode = async (req, res, next) => {
     next(err);
   }
 };
+
+// ✅ GET /api/users/:id - Récupérer un utilisateur par son ID
+exports.getUserById = async (req, res) => {
+  try {
+    const userId = req.params.id;
+    
+    console.log('📥 Fetching user:', userId);
+    
+    // Trouver l'utilisateur
+    const user = await User.findById(userId).select('-password -__v');
+    
+    if (!user) {
+      console.log('❌ User not found:', userId);
+      return res.status(404).json({ 
+        success: false,
+        message: 'User not found' 
+      });
+    }
+    
+    console.log('✅ User found:', user.name || user.email);
+    
+    // Retourner les données utilisateur
+    res.status(200).json(user);
+    
+  } catch (error) {
+    console.error('❌ Error fetching user:', error);
+    res.status(500).json({ 
+      success: false,
+      message: 'Error fetching user',
+      error: error.message 
+    });
+  }
+};
+
+// ✅ GET /api/users - Récupérer plusieurs utilisateurs
+exports.getAllUsers = async (req, res) => {
+  try {
+    const users = await User.find().select('-password -__v').limit(50);
+    res.status(200).json(users);
+  } catch (error) {
+    console.error('Error fetching users:', error);
+    res.status(500).json({ 
+      success: false,
+      message: 'Error fetching users' 
+    });
+  }
+};
