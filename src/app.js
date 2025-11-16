@@ -6,6 +6,7 @@ const morgan = require('morgan');
 const path = require('path');
 const chatRoutes = require("./routes/chatRoutes");
 const paymentRouter = require('./controllers/paymentController');
+const User = require('./models/User'); // ✅ ADD THIS LINE
 
 
 // === MongoDB Connection ===
@@ -49,6 +50,12 @@ app.get('/test-google', (req, res) => {
 app.get('/test-stripe', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'test_stripe.html'));
 });
+
+// Route to test Stripe
+app.get('/test-message', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'test_message.html'));
+});
+
 
 
 
