@@ -20,6 +20,18 @@ const PreferenceSchema = new mongoose.Schema({
 // Main User schema
 const UserSchema = new mongoose.Schema({
   phone: { type: String },
+  // ✅ Ajouter ces champs
+  registrationMethod: { 
+    type: String, 
+    enum: ['email', 'google', 'phone'], 
+    default: 'email' 
+  },
+  firstName: { type: String },
+  lastName: { type: String },
+  age: { type: Number, min: 18 },
+  country: { type: String },
+  city: { type: String },
+  profileCompleted: { type: Boolean, default: false },
   phoneVerified: { type: Boolean, default: false },
   phoneVerificationCode: { type: String },
   phoneVerificationExpires: { type: Date },
@@ -38,6 +50,8 @@ const UserSchema = new mongoose.Schema({
   },
   avatar: String,
   emailVerified: { type: Boolean, default: false },
+  emailVerificationCode: String,
+  emailVerificationExpires: Date,
   provider: { type: String, enum: ['local', 'google'], default: 'local' },
   createdAt: { type: Date, default: Date.now },
   lastActive: Date,

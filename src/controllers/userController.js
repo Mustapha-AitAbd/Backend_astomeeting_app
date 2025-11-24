@@ -203,3 +203,101 @@ exports.getAllUsers = async (req, res) => {
     });
   }
 };
+
+
+// ✅ AJOUTER CETTE FONCTION À LA TOUTE FIN
+exports.completeProfile = async (req, res) => {
+  try {
+    const { 
+      registrationMethod, 
+      firstName, 
+      lastName, 
+      age, 
+      country, 
+      city, 
+      gender 
+    } = req.body;
+
+    console.log('📝 Complete profile request:', req.body);
+    console.log('👤 User from token:', req.user);
+
+    // Validation des champs requis
+    if (!firstName || !lastName || !age || !country || !city || !gender) {
+      return res.status(400).json({ 
+        success: false,
+        message: 'All fields are required: firstName, lastName, age, country, city, gender' 
+      });
+    }
+
+    // Validation de l'âge
+    if (age < 18) {
+      return res.status(400).json({ 
+        success: false,
+        message: 'You must be at least 18 years old' 
+      });
+    }
+
+    // Validation du genre
+    if (!['M', 'F', 'Other'].includes(gender)) {
+      return res.status(400).json({ 
+        success: false,
+        message: 'Gender must be M, F, or Other' 
+      });
+    }
+
+    // Récupérer l'ID utilisateur du token
+    const userId = req.user.id || req.user._id;
+
+    if (!userId) {
+      return res.status(401).json({ 
+        success: false,
+        message: 'User not authenticated' 
+      });
+    }
+
+    // Importer User si pas déjà fait en haut du fichier
+    const User = require('../models/User');
+
+    // Mettre à jour le profil
+    const updatedUser = await User.findByIdAndUpdate(
+      userId,
+      {
+        $set: {
+          registrationMethod: registrationMethod || 'email',
+          firstName,
+          lastName,
+          age,
+          country,
+          city,
+          gender,
+          name: `${firstName} ${lastName}`,
+          profileCompleted: true
+        }
+      },
+      { new: true, runValidators: true }
+    ).select('-password -__v');
+
+    if (!updatedUser) {
+      return res.status(404).json({ 
+        success: false,
+        message: 'User not found' 
+      });
+    }
+
+    console.log('✅ Profile completed successfully for:', updatedUser.email);
+
+    res.status(200).json({
+      success: true,
+      message: 'Profile completed successfully',
+      data: updatedUser
+    });
+
+  } catch (error) {
+    console.error('❌ Error completing profile:', error);
+    res.status(500).json({ 
+      success: false,
+      message: 'Error completing profile',
+      error: error.message 
+    });
+  }
+};
