@@ -1,28 +1,28 @@
 // src/routes/users.js
 const express = require('express');
 const router = express.Router();
+const verifyToken = require('../middlewares/auth');
 const { 
   getMe, 
   updateMe, 
-  getNearbyUsers,
-  getUserById,      // ✅ Ajoutez cette fonction
-  getAllUsers       // ✅ Ajoutez cette fonction
+  getNearbyUsers,  // ✅ IMPORTER CETTE FONCTION
+  getUserById, 
+  getAllUsers 
 } = require('../controllers/userController');
-const auth = require('../middlewares/auth');
 
-// Get user's profile
-router.get('/me', getMe);
+// Get current user profile
+router.get('/me', verifyToken, getMe);
 
-// Profile update
-router.put('/me', updateMe);
+// Update current user profile
+router.put('/me', verifyToken, updateMe);
 
-// Search for nearby users
-router.get('/nearby', getNearbyUsers);
+// ✅ Get nearby users (avec la fonction importée)
+router.get('/nearby', verifyToken, getNearbyUsers);
 
-// ✅ GET /api/users/:id - Récupérer un utilisateur par son ID
-router.get('/:id', getUserById);
+// Get user by ID
+router.get('/:id', verifyToken, getUserById);
 
-// ✅ GET /api/users - Récupérer plusieurs utilisateurs
-router.get('/', getAllUsers);
+// Get all users
+router.get('/', verifyToken, getAllUsers);
 
 module.exports = router;
