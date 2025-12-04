@@ -1,19 +1,20 @@
 // src/routes/auth.js
 const express = require('express');
-const User = require('../models/User');
 const router = express.Router();
 const verifyToken = require('../middlewares/auth');
-const { protect } = require('../middlewares/authMiddleware');
-const { sendPhoneVerificationCode, verifyPhoneCode } = require('../controllers/userController');
 
-// ✅ IMPORTER TOUT LE MODULE POUR DEBUG
+// ✅ Import authController functions
 const authController = require('../controllers/authController');
 const { googleSignIn, testGoogleSetup } = require('../controllers/googleAuthController');
 
-// ✅ DEBUG : Vérifier quelles fonctions existent
-console.log('🔍 AuthController functions:', Object.keys(authController));
+// ✅ Import phone verification functions
+const { 
+  sendPhoneVerificationCode, 
+  verifyPhoneCode,
+  resendPhoneVerificationCode 
+} = require('../controllers/userController');
 
-// Destructurer les fonctions
+// Destructure authController functions
 const {
   register,
   login,
@@ -29,13 +30,7 @@ const {
   completeProfile
 } = authController;
 
-// ✅ Vérifier chaque fonction individuellement
-console.log('register:', typeof register);
-console.log('login:', typeof login);
-console.log('completeProfile:', typeof completeProfile);
-console.log('verifyEmailCode:', typeof verifyEmailCode);
-console.log('resendVerificationCode:', typeof resendVerificationCode);
-
+// ==================== PUBLIC ROUTES ====================
 // Register
 router.post('/register', register);
 
@@ -46,12 +41,22 @@ router.post('/resend-verification-code', resendVerificationCode);
 // Login
 router.post('/login', login);
 
-// ✅ Compléter le profil (LIGNE 35 ENVIRON)
+// Password reset
+router.post('/password-reset-request', passwordResetRequest);
+router.post('/password-reset', passwordReset);
+
+// Google login
+router.post('/google', googleSignIn);
+router.get('/test-google-setup', testGoogleSetup);
+
+// ==================== PROTECTED ROUTES ====================
+// ✅ Complete profile (requires authentication)
 router.post('/complete-profile', verifyToken, completeProfile);
 
+// ✅ Get current user
 router.get('/me', verifyToken, (req, res) => {
   try {
-    if (!req.user) return res.status(404).json({ message: 'Utilisateur non trouvé' });
+    if (!req.user) return res.status(404).json({ message: 'User not found' });
     res.json(req.user);
   } catch (err) {
     res.status(500).json({ message: err.message });
@@ -64,20 +69,18 @@ router.post('/logout', isTokenValid, logout);
 // Refresh access token
 router.post('/refresh', refresh);
 
-// Password reset
-router.post('/password-reset-request', passwordResetRequest);
-router.post('/password-reset', passwordReset);
-
 // Verify phone and email
 router.post('/verify-phone', isTokenValid, verifyPhone);
 router.post('/verify-email', isTokenValid, verifyEmail);
 
-// Google login
-router.post('/google', googleSignIn);
-router.get('/test-google-setup', testGoogleSetup);
+// ==================== 📱 PHONE VERIFICATION ROUTES ====================
+// ✅ Send phone verification code (PROTECTED with isTokenValid)
+router.post('/send-phone-code', isTokenValid, sendPhoneVerificationCode);
 
-// Phone verification
-router.post('/send-phone-code', sendPhoneVerificationCode);
-router.post('/check-phone-code', verifyPhoneCode);
+// ✅ Verify phone code (PROTECTED with isTokenValid)
+router.post('/verify-phone-code', isTokenValid, verifyPhoneCode);
+
+// ✅ Resend phone verification code (PROTECTED with isTokenValid)
+router.post('/resend-phone-code', isTokenValid, resendPhoneVerificationCode);
 
 module.exports = router;

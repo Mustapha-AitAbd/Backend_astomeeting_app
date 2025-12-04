@@ -1,8 +1,11 @@
 // src/controllers/userController.js
 const User = require('../models/User');
 const crypto = require('crypto');
-const twilio = require('twilio')(process.env.TWILIO_SID, process.env.TWILIO_AUTH_TOKEN);
-
+// ✅ Initialize Twilio client
+const twilio = require('twilio')(
+  process.env.TWILIO_SID, 
+  process.env.TWILIO_AUTH_TOKEN
+);
 
 
 
@@ -87,62 +90,116 @@ exports.getNearbyUsers = async (req, res, next) => {
 };
 
 
+
 // 📌 Step 1: Send verification code via SMS using Twilio
 exports.sendPhoneVerificationCode = async (req, res, next) => {
   try {
-    const { email, phone } = req.body;
-    if (!email || !phone) {
-      return res.status(400).json({ message: 'Email and phone are required' });
+    const { phone } = req.body;
+    
+    // ✅ Get user from token (via middleware isTokenValid)
+    const userId = req.user._id;
+
+    if (!phone) {
+      return res.status(400).json({ message: 'Phone number is required' });
+    }
+
+    // ✅ Validate phone format (should start with +)
+    if (!phone.startsWith('+')) {
+      return res.status(400).json({ 
+        message: 'Phone number must be in international format (e.g., +212612345678)' 
+      });
     }
 
     // Generate a random 6-digit code
     const code = crypto.randomInt(100000, 999999).toString();
 
     // Save in MongoDB with 5 min expiration
-    const user = await User.findOneAndUpdate(
-      { email },
+    const user = await User.findByIdAndUpdate(
+      userId,
       {
         phone,
+        phoneVerified: false, // Reset verification status
         phoneVerificationCode: code,
-        phoneVerificationExpires: Date.now() + 5 * 60 * 1000
+        phoneVerificationExpires: Date.now() + 5 * 60 * 1000 // 5 minutes
       },
       { new: true }
     );
 
     if (!user) {
-      return res.status(404).json({ message: 'User not found with this email' });
+      return res.status(404).json({ message: 'User not found' });
     }
 
-    // Send via SMS using Twilio
-    await twilio.messages.create({
-      body: `Your verification code is : ${code}`,
-      from: process.env.TWILIO_PHONE, // Twilio configured number
-      to: phone
-    });
+    // ✅ Send via SMS using Twilio
+    try {
+      await twilio.messages.create({
+        body: `Your verification code is: ${code}. Valid for 5 minutes.`,
+        from: process.env.TWILIO_PHONE,
+        to: phone
+      });
 
-    res.json({ message: 'Verification code sent via SMS' });
+      console.log(`✅ SMS sent to ${phone} for user ${user.email}`);
+      
+      res.json({ 
+        message: 'Verification code sent via SMS',
+        phone: phone.replace(/(\+\d{3})\d{6}(\d{3})/, '$1******$2') // Mask phone
+      });
+    } catch (twilioError) {
+      console.error('❌ Twilio Error:', twilioError);
+      
+      // Clean up verification data if SMS fails
+      user.phoneVerificationCode = undefined;
+      user.phoneVerificationExpires = undefined;
+      await user.save();
+      
+      return res.status(500).json({ 
+        message: 'Failed to send SMS',
+        error: twilioError.message 
+      });
+    }
   } catch (err) {
+    console.error('❌ Error in sendPhoneVerificationCode:', err);
     next(err);
   }
 };
 
-// 📌 Step 2: Code verification
+// 📌 Step 2: Verify phone code
 exports.verifyPhoneCode = async (req, res, next) => {
   try {
-    const { email, code } = req.body;
-    if (!email || !code) {
-      return res.status(400).json({ message: 'Email and code are required' });
+    const { code } = req.body;
+    
+    // ✅ Get user from token (via middleware isTokenValid)
+    const userId = req.user.id;
+
+    if (!code) {
+      return res.status(400).json({ message: 'Verification code is required' });
     }
 
-    const user = await User.findOne({ email });
+    const user = await User.findById(userId);
 
-    if (
-      !user ||
-      !user.phoneVerificationCode ||
-      user.phoneVerificationCode !== code ||
-      Date.now() > user.phoneVerificationExpires
-    ) {
-      return res.status(400).json({ message: 'Invalid or expired code' });
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    // ✅ Check if code exists and is not expired
+    if (!user.phoneVerificationCode) {
+      return res.status(400).json({ 
+        message: 'No verification code found. Please request a new code.' 
+      });
+    }
+
+    if (user.phoneVerificationCode !== code) {
+      return res.status(400).json({ message: 'Invalid verification code' });
+    }
+
+    if (Date.now() > user.phoneVerificationExpires) {
+      // Clean expired code
+      user.phoneVerificationCode = undefined;
+      user.phoneVerificationExpires = undefined;
+      await user.save();
+      
+      return res.status(400).json({ 
+        message: 'Verification code has expired. Please request a new code.' 
+      });
     }
 
     // ✅ Validation OK → activate the phone number
@@ -151,8 +208,36 @@ exports.verifyPhoneCode = async (req, res, next) => {
     user.phoneVerificationExpires = undefined;
     await user.save();
 
-    res.json({ message: 'Phone number verified successfully', phone: user.phone });
+    console.log(`✅ Phone verified for user ${user.email}`);
+
+    res.json({ 
+      message: 'Phone number verified successfully', 
+      phone: user.phone,
+      phoneVerified: true
+    });
   } catch (err) {
+    console.error('❌ Error in verifyPhoneCode:', err);
+    next(err);
+  }
+};
+
+// 📌 Optional: Resend verification code
+exports.resendPhoneVerificationCode = async (req, res, next) => {
+  try {
+    const userId = req.user.id;
+    const user = await User.findById(userId);
+
+    if (!user || !user.phone) {
+      return res.status(400).json({ 
+        message: 'No phone number found. Please add a phone number first.' 
+      });
+    }
+
+    // Reuse the sendPhoneVerificationCode logic
+    req.body.phone = user.phone;
+    return exports.sendPhoneVerificationCode(req, res, next);
+  } catch (err) {
+    console.error('❌ Error in resendPhoneVerificationCode:', err);
     next(err);
   }
 };

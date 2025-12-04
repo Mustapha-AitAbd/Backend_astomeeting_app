@@ -211,14 +211,79 @@ exports.logout = async (req, res) => {
   }
 };
 
-// Middleware to check if the token is blacklisted
-exports.isTokenValid = (req, res, next) => {
-  const token = req.headers.authorization?.split(' ')[1];
-  if (token && blacklistedTokens.has(token)) {
-    return res.status(401).json({ message: 'Token invalidated' });
+// ✅ Middleware complet pour valider JWT + vérifier blacklist
+exports.isTokenValid = async (req, res, next) => {
+  try {
+    // Get token from header
+    const authHeader = req.headers.authorization;
+    
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return res.status(401).json({ 
+        message: 'Access denied. No token provided.' 
+      });
+    }
+
+    // Extract token
+    const token = authHeader.split(' ')[1];
+
+    // ✅ Check if token is blacklisted
+    if (blacklistedTokens.has(token)) {
+      return res.status(401).json({ message: 'Token invalidated (logged out)' });
+    }
+
+    // ✅ Verify and decode JWT token
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    
+    // ✅ Find user and attach to request
+    const user = await User.findById(decoded.id).select('-password');
+    
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    // ✅ Attach user to request object
+    req.user = user;
+    req.token = token; // Optionnel: pour l'utiliser dans le logout
+    next();
+  } catch (error) {
+    console.error('❌ Token validation error:', error);
+    
+    if (error.name === 'JsonWebTokenError') {
+      return res.status(401).json({ message: 'Invalid token' });
+    }
+    if (error.name === 'TokenExpiredError') {
+      return res.status(401).json({ message: 'Token expired' });
+    }
+    
+    res.status(500).json({ message: 'Token validation failed' });
   }
-  next();
 };
+
+// ✅ Function to add token to blacklist (for logout)
+exports.blacklistToken = (token) => {
+  blacklistedTokens.add(token);
+  console.log(`🔒 Token blacklisted. Total: ${blacklistedTokens.size}`);
+};
+
+// ✅ Function to clear old tokens (optionnel, pour éviter de surcharger la mémoire)
+exports.clearExpiredTokens = () => {
+  // Cette fonction peut être appelée périodiquement pour nettoyer
+  // les tokens expirés de la blacklist
+  const now = Date.now() / 1000;
+  blacklistedTokens.forEach((token) => {
+    try {
+      const decoded = jwt.decode(token);
+      if (decoded && decoded.exp < now) {
+        blacklistedTokens.delete(token);
+      }
+    } catch (err) {
+      blacklistedTokens.delete(token);
+    }
+  });
+};
+
+// ✅ Optional: protect middleware (alias)
+exports.protect = exports.isTokenValid;
 
 // Refresh access token using refresh token
 exports.refresh = async (req, res) => {
@@ -324,9 +389,9 @@ exports.verifyEmail = async (req, res, next) => {
 // ✅ NOUVELLE FONCTION - À AJOUTER ICI
 exports.completeProfile = async (req, res) => {
   try {
-    const { registrationMethod, firstName, lastName, age, country, city, gender } = req.body;
+    const { registrationMethod, firstName, lastName, age, country, gender } = req.body;
 
-    if (!firstName || !lastName || !age || !country || !city || !gender) {
+    if (!firstName || !lastName || !age || !country || !gender) {
       return res.status(400).json({ 
         success: false,
         message: 'All fields are required' 
@@ -352,7 +417,6 @@ exports.completeProfile = async (req, res) => {
           lastName,
           age,
           country,
-          city,
           gender,
           name: `${firstName} ${lastName}`,
           profileCompleted: true

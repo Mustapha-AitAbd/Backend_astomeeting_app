@@ -20,7 +20,7 @@ module.exports = (requiredPlan = 'premium') => async (req, res, next) => {
     req.currentUser = user;
     next();
   } catch (err) {
-    console.error('checkSubscription error:', err);
-    res.status(500).json({ message: 'Erreur serveur' });
+    console.error('checkSubscription erro:', err);
+    res.status(500).json({ message: 'Server error' });
   }
 };
