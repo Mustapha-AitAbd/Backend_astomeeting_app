@@ -27,7 +27,8 @@ const {
   isTokenValid,
   verifyEmailCode,
   resendVerificationCode,
-  completeProfile
+  completeProfile,
+  resendPhoneVerificationCode
 } = authController;
 
 // ==================== PUBLIC ROUTES ====================
