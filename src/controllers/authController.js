@@ -382,21 +382,7 @@ exports.passwordReset = async (req, res, next) => {
   }
 };
 
-// Verify phone (dummy SMS code logic)
-exports.verifyPhone = async (req, res, next) => {
-  try {
-    const { code } = req.body;
-    // TODO: validate code with SMS provider (Twilio, etc.)
-    if (code === '1234') {
-      req.user.phoneVerified = true;
-      await req.user.save();
-      return res.json({ message: 'Phone verified successfully' });
-    }
-    res.status(400).json({ message: 'Invalid code' });
-  } catch (err) {
-    next(err);
-  }
-};
+
 
 // Legacy verify email (kept for compatibility)
 exports.verifyEmail = async (req, res, next) => {
