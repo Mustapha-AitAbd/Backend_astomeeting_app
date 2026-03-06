@@ -31,8 +31,7 @@ router.put('/users/:id/password', adminController.updateUserPassword);
 // PUT /api/admin/users/:id/verify-email - Vérifie manuellement l'email
 router.put('/users/:id/verify-email', adminController.verifyUserEmail);
 
-// PUT /api/admin/users/:id/verify-phone - Vérifie manuellement le téléphone
-router.put('/users/:id/verify-phone', adminController.verifyUserPhone);
+
 
 // POST /api/admin/users/bulk-delete - Supprime plusieurs utilisateurs
 router.post('/users/bulk-delete', adminController.bulkDeleteUsers);

@@ -7,12 +7,6 @@ const verifyToken = require('../middlewares/auth');
 const authController = require('../controllers/authController');
 const { googleSignIn, testGoogleSetup } = require('../controllers/googleAuthController');
 
-// ✅ Import phone verification functions
-const { 
-  sendPhoneVerificationCode, 
-  verifyPhoneCode,
-  resendPhoneVerificationCode 
-} = require('../controllers/userController');
 
 // Destructure authController functions
 const {
@@ -22,7 +16,6 @@ const {
   refresh,
   passwordResetRequest,
   passwordReset,
-  verifyPhone,
   verifyEmail,
   isTokenValid,
   verifyEmailCode,
@@ -69,19 +62,10 @@ router.post('/logout', isTokenValid, logout);
 // Refresh access token
 router.post('/refresh', refresh);
 
-// Verify phone and email
-router.post('/verify-phone', isTokenValid, verifyPhone);
-router.post('/verify-email', isTokenValid, verifyEmail);
 
-// ==================== 📱 PHONE VERIFICATION ROUTES ====================
-// ✅ Send phone verification code (PROTECTED with isTokenValid)
-router.post('/send-phone-code', isTokenValid, sendPhoneVerificationCode);
 
-// ✅ Verify phone code (PROTECTED with isTokenValid)
-router.post('/verify-phone-code', isTokenValid, verifyPhoneCode);
 
-// ✅ Resend phone verification code (PROTECTED with isTokenValid)
-router.post('/resend-phone-code', isTokenValid, resendPhoneVerificationCode);
+
 
 // ✅ Update user location
 router.post('/update-location', verifyToken, authController.updateUserLocation);
