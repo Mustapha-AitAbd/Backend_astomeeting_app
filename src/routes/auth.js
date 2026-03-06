@@ -28,7 +28,6 @@ const {
   verifyEmailCode,
   resendVerificationCode,
   completeProfile,
-  resendPhoneVerificationCode
 } = authController;
 
 // ==================== PUBLIC ROUTES ====================
@@ -83,5 +82,11 @@ router.post('/verify-phone-code', isTokenValid, verifyPhoneCode);
 
 // ✅ Resend phone verification code (PROTECTED with isTokenValid)
 router.post('/resend-phone-code', isTokenValid, resendPhoneVerificationCode);
+
+// ✅ Update user location
+router.post('/update-location', verifyToken, authController.updateUserLocation);
+
+// ✅ Get user by token (alternative à /me)
+router.get('/user', isTokenValid, authController.getUserByToken);
 
 module.exports = router;

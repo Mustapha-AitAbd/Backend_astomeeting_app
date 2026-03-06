@@ -1,0 +1,687 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Photo Management - Complete</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      padding: 20px;
+    }
+    
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+    
+    h1 {
+      color: white;
+      text-align: center;
+      margin-bottom: 30px;
+      font-size: 2.5em;
+      text-shadow: 2px 2px 4px rgba(0,0,0,0.2);
+    }
+    
+    .section {
+      background: white;
+      margin-bottom: 30px;
+      padding: 25px;
+      border-radius: 15px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+    }
+    
+    .section h2 {
+      color: #667eea;
+      margin-bottom: 20px;
+      font-size: 1.5em;
+      border-bottom: 2px solid #667eea;
+      padding-bottom: 10px;
+    }
+    
+    input[type="text"], input[type="file"] {
+      width: 100%;
+      padding: 12px;
+      margin: 10px 0;
+      border: 2px solid #e0e0e0;
+      border-radius: 8px;
+      font-size: 14px;
+      transition: border-color 0.3s;
+    }
+    
+    input[type="text"]:focus {
+      outline: none;
+      border-color: #667eea;
+    }
+    
+    button {
+      padding: 12px 24px;
+      margin: 10px 5px 10px 0;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 600;
+      transition: all 0.3s;
+      box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    }
+    
+    button:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 12px rgba(0,0,0,0.15);
+    }
+    
+    button:active {
+      transform: translateY(0);
+    }
+    
+    .btn-primary {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+    }
+    
+    .btn-success {
+      background: #28a745;
+      color: white;
+    }
+    
+    .btn-danger {
+      background: #dc3545;
+      color: white;
+    }
+    
+    .btn-warning {
+      background: #ffc107;
+      color: #212529;
+    }
+    
+    .photos-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+      gap: 20px;
+      margin-top: 20px;
+    }
+    
+    .photo-card {
+      background: white;
+      border: 2px solid #e0e0e0;
+      border-radius: 12px;
+      overflow: hidden;
+      transition: all 0.3s;
+      position: relative;
+    }
+    
+    .photo-card:hover {
+      transform: translateY(-5px);
+      box-shadow: 0 8px 16px rgba(0,0,0,0.2);
+    }
+    
+    .photo-card img {
+      width: 100%;
+      height: 250px;
+      object-fit: cover;
+      display: block;
+    }
+    
+    .photo-info {
+      padding: 15px;
+    }
+    
+    .photo-actions {
+      display: flex;
+      gap: 8px;
+    }
+    
+    .photo-actions button {
+      flex: 1;
+      font-size: 12px;
+      padding: 8px;
+      margin: 0;
+    }
+    
+    .main-badge {
+      position: absolute;
+      top: 15px;
+      right: 15px;
+      background: #28a745;
+      color: white;
+      padding: 8px 16px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: bold;
+      box-shadow: 0 2px 8px rgba(40, 167, 69, 0.4);
+      animation: pulse 2s infinite;
+    }
+    
+    @keyframes pulse {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.05); }
+    }
+    
+    .upload-date {
+      color: #666;
+      font-size: 12px;
+      margin-top: 8px;
+      text-align: center;
+    }
+    
+    pre {
+      background: #f8f9fa;
+      padding: 15px;
+      border-radius: 8px;
+      overflow-x: auto;
+      max-height: 300px;
+      border: 1px solid #e0e0e0;
+      font-size: 12px;
+    }
+    
+    .status-message {
+      padding: 12px;
+      border-radius: 8px;
+      margin-top: 10px;
+      animation: slideIn 0.3s;
+    }
+    
+    @keyframes slideIn {
+      from {
+        opacity: 0;
+        transform: translateY(-10px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+    
+    .error {
+      background: #f8d7da;
+      color: #721c24;
+      border: 1px solid #f5c6cb;
+    }
+    
+    .success {
+      background: #d4edda;
+      color: #155724;
+      border: 1px solid #c3e6cb;
+    }
+    
+    .info {
+      background: #d1ecf1;
+      color: #0c5460;
+      border: 1px solid #bee5eb;
+    }
+    
+    .empty-state {
+      text-align: center;
+      padding: 60px 20px;
+      color: #666;
+    }
+    
+    .empty-state svg {
+      width: 100px;
+      height: 100px;
+      margin-bottom: 20px;
+      opacity: 0.3;
+    }
+    
+    .stats {
+      display: flex;
+      gap: 20px;
+      margin-top: 20px;
+    }
+    
+    .stat-card {
+      flex: 1;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      padding: 20px;
+      border-radius: 10px;
+      text-align: center;
+    }
+    
+    .stat-number {
+      font-size: 2em;
+      font-weight: bold;
+      margin-bottom: 5px;
+    }
+    
+    .stat-label {
+      font-size: 0.9em;
+      opacity: 0.9;
+    }
+    
+    .file-input-wrapper {
+      position: relative;
+      overflow: hidden;
+      display: inline-block;
+      width: 100%;
+    }
+    
+    .file-input-wrapper input[type=file] {
+      position: absolute;
+      left: -9999px;
+    }
+    
+    .file-input-label {
+      display: block;
+      padding: 12px;
+      background: #f8f9fa;
+      border: 2px dashed #667eea;
+      border-radius: 8px;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.3s;
+    }
+    
+    .file-input-label:hover {
+      background: #e9ecef;
+      border-color: #764ba2;
+    }
+    
+    .file-name {
+      margin-top: 10px;
+      color: #666;
+      font-size: 14px;
+    }
+    
+    .loading {
+      display: inline-block;
+      width: 20px;
+      height: 20px;
+      border: 3px solid rgba(255,255,255,.3);
+      border-radius: 50%;
+      border-top-color: #fff;
+      animation: spin 1s ease-in-out infinite;
+    }
+    
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🖼️ Photo Management System</h1>
+
+    <!-- Token Section -->
+    <div class="section">
+      <h2>🔐 Authentication</h2>
+      <input type="text" id="token" placeholder="Paste your JWT token here">
+      <button class="btn-primary" onclick="saveToken()">💾 Save Token</button>
+      <button class="btn-warning" onclick="testConnection()">🔌 Test Connection</button>
+      <div id="tokenStatus"></div>
+    </div>
+
+    <!-- Upload Photo Section -->
+    <div class="section">
+      <h2>📤 Upload New Photo</h2>
+      <div class="file-input-wrapper">
+        <input type="file" id="photoFile" accept="image/*" onchange="updateFileName()">
+        <label for="photoFile" class="file-input-label">
+          📁 Click to select an image<br>
+          <small>JPG, PNG, WEBP (Max 5MB)</small>
+        </label>
+      </div>
+      <div id="fileName" class="file-name"></div>
+      <button class="btn-success" onclick="uploadPhoto()">
+        ⬆️ Upload Photo
+      </button>
+      <pre id="uploadResult"></pre>
+    </div>
+
+    <!-- Display Photos Section -->
+    <div class="section">
+      <h2>🖼️ My Photos</h2>
+      <button class="btn-primary" onclick="loadPhotos()">🔄 Refresh Photos</button>
+      
+      <div class="stats" id="statsSection" style="display: none;">
+        <div class="stat-card">
+          <div class="stat-number" id="totalPhotos">0</div>
+          <div class="stat-label">Total Photos</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-number" id="mainPhotoStatus">-</div>
+          <div class="stat-label">Main Photo</div>
+        </div>
+      </div>
+      
+      <div id="photosGrid" class="photos-grid"></div>
+    </div>
+
+    <!-- User Profile Preview -->
+    <div class="section">
+      <h2>👤 Profile Preview</h2>
+      <button class="btn-primary" onclick="loadUserProfile()">🔍 Load My Profile</button>
+      <pre id="profileData"></pre>
+    </div>
+  </div>
+
+  <script>
+    const API_URL = 'http://localhost:5000/api';
+    let authToken = '';
+    let currentPhotos = [];
+
+    function saveToken() {
+      authToken = document.getElementById('token').value.trim();
+      if (!authToken) {
+        showStatus('tokenStatus', 'Please enter a token', 'error');
+        return;
+      }
+      localStorage.setItem('authToken', authToken);
+      showStatus('tokenStatus', '✅ Token saved successfully!', 'success');
+      console.log('✅ Token saved');
+    }
+
+    function updateFileName() {
+      const fileInput = document.getElementById('photoFile');
+      const fileNameDiv = document.getElementById('fileName');
+      if (fileInput.files.length > 0) {
+        const file = fileInput.files[0];
+        const sizeMB = (file.size / (1024 * 1024)).toFixed(2);
+        fileNameDiv.innerHTML = `<strong>Selected:</strong> ${file.name} (${sizeMB} MB)`;
+      } else {
+        fileNameDiv.innerHTML = '';
+      }
+    }
+
+    window.onload = function() {
+      const savedToken = localStorage.getItem('authToken');
+      if (savedToken) {
+        authToken = savedToken;
+        document.getElementById('token').value = savedToken;
+        showStatus('tokenStatus', '✅ Token loaded from storage', 'success');
+        console.log('✅ Token loaded from localStorage');
+      }
+    };
+
+    async function testConnection() {
+      if (!authToken) {
+        alert('Please set your token first');
+        return;
+      }
+
+      console.log('🔌 Testing connection...');
+      try {
+        const response = await fetch(`${API_URL}/users/me`, {
+          headers: {
+            'Authorization': `Bearer ${authToken}`
+          }
+        });
+
+        const data = await response.json();
+        console.log('📥 Connection test result:', data);
+        
+        if (data.success) {
+          showStatus('tokenStatus', `✅ Connected as: ${data.data.email}`, 'success');
+        } else {
+          showStatus('tokenStatus', `❌ Connection failed: ${data.message}`, 'error');
+        }
+      } catch (error) {
+        console.error('❌ Connection error:', error);
+        showStatus('tokenStatus', `❌ Connection error: ${error.message}`, 'error');
+      }
+    }
+
+    async function uploadPhoto() {
+      const fileInput = document.getElementById('photoFile');
+      const file = fileInput.files[0];
+      
+      if (!file) {
+        alert('Please select a photo first');
+        return;
+      }
+
+      if (!authToken) {
+        alert('Please set your token first');
+        return;
+      }
+
+      if (file.size > 5 * 1024 * 1024) {
+        alert('File is too large! Maximum size is 5MB');
+        return;
+      }
+
+      const formData = new FormData();
+      formData.append('photo', file);
+
+      console.log('📤 Uploading photo:', file.name, file.type, file.size, 'bytes');
+      document.getElementById('uploadResult').textContent = 'Uploading...';
+
+      try {
+        const response = await fetch(`${API_URL}/users/photos`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${authToken}`
+          },
+          body: formData
+        });
+
+        console.log('📥 Response status:', response.status);
+        const data = await response.json();
+        console.log('📥 Response data:', data);
+        
+        document.getElementById('uploadResult').textContent = JSON.stringify(data, null, 2);
+        
+        if (data.success) {
+          alert('✅ Photo uploaded successfully!');
+          fileInput.value = '';
+          document.getElementById('fileName').innerHTML = '';
+          loadPhotos();
+        } else {
+          alert('❌ ' + data.message);
+        }
+      } catch (error) {
+        console.error('❌ Upload error:', error);
+        document.getElementById('uploadResult').innerHTML = `Error: ${error.message}`;
+        alert('Error uploading photo: ' + error.message);
+      }
+    }
+
+    async function loadPhotos() {
+      if (!authToken) {
+        alert('Please set your token first');
+        return;
+      }
+
+      console.log('📥 Loading photos...');
+
+      try {
+        const response = await fetch(`${API_URL}/users/photos`, {
+          headers: {
+            'Authorization': `Bearer ${authToken}`
+          }
+        });
+
+        console.log('📥 Response status:', response.status);
+        const data = await response.json();
+        console.log('📥 Photos data:', data);
+        
+        if (data.success) {
+          currentPhotos = data.data.photos;
+          displayPhotos(data.data.photos);
+          updateStats(data.data);
+        } else {
+          alert('❌ ' + data.message);
+        }
+      } catch (error) {
+        console.error('❌ Error loading photos:', error);
+        alert('Error loading photos: ' + error.message);
+      }
+    }
+
+    function updateStats(data) {
+      const statsSection = document.getElementById('statsSection');
+      const totalPhotos = document.getElementById('totalPhotos');
+      const mainPhotoStatus = document.getElementById('mainPhotoStatus');
+      
+      if (data.totalPhotos > 0) {
+        statsSection.style.display = 'flex';
+        totalPhotos.textContent = data.totalPhotos;
+        mainPhotoStatus.textContent = data.mainPhoto ? '✓' : '✗';
+      } else {
+        statsSection.style.display = 'none';
+      }
+    }
+
+    function displayPhotos(photos) {
+      const grid = document.getElementById('photosGrid');
+      
+      if (photos.length === 0) {
+        grid.innerHTML = `
+          <div class="empty-state">
+            <svg fill="currentColor" viewBox="0 0 20 20">
+              <path fill-rule="evenodd" d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2H4zm12 12H4l4-8 3 6 2-4 3 6z" clip-rule="evenodd"/>
+            </svg>
+            <h3>No photos yet</h3>
+            <p>Upload your first photo to get started!</p>
+          </div>
+        `;
+        return;
+      }
+
+      grid.innerHTML = photos.map(photo => {
+        const uploadDate = new Date(photo.uploadedAt).toLocaleDateString('en-US', {
+          year: 'numeric',
+          month: 'short',
+          day: 'numeric'
+        });
+        
+        return `
+          <div class="photo-card">
+            ${photo.isMain ? '<div class="main-badge">⭐ MAIN</div>' : ''}
+            <img src="${photo.url}" alt="Profile photo" loading="lazy">
+            <div class="photo-info">
+              <div class="upload-date">📅 ${uploadDate}</div>
+              <div class="photo-actions">
+                ${!photo.isMain ? 
+                  `<button class="btn-success" onclick="setMainPhoto('${photo._id}')">⭐ Set Main</button>` : 
+                  `<button class="btn-success" disabled style="opacity: 0.6;">⭐ Is Main</button>`
+                }
+                <button class="btn-danger" onclick="deletePhoto('${photo._id}')">🗑️ Delete</button>
+              </div>
+            </div>
+          </div>
+        `;
+      }).join('');
+
+      console.log('✅ Displayed', photos.length, 'photos');
+    }
+
+    async function setMainPhoto(photoId) {
+      if (!authToken) {
+        alert('Please set your token first');
+        return;
+      }
+
+      if (!confirm('Set this photo as your main profile photo?')) {
+        return;
+      }
+
+      console.log('🔄 Setting main photo:', photoId);
+
+      try {
+        const response = await fetch(`${API_URL}/users/photos/${photoId}/main`, {
+          method: 'PUT',
+          headers: {
+            'Authorization': `Bearer ${authToken}`
+          }
+        });
+
+        const data = await response.json();
+        console.log('📥 Response:', data);
+        
+        if (data.success) {
+          alert('✅ Main photo updated successfully!');
+          loadPhotos();
+        } else {
+          alert('❌ ' + data.message);
+        }
+      } catch (error) {
+        console.error('❌ Error:', error);
+        alert('Error setting main photo: ' + error.message);
+      }
+    }
+
+    async function deletePhoto(photoId) {
+      if (!confirm('⚠️ Are you sure you want to delete this photo?\nThis action cannot be undone.')) {
+        return;
+      }
+
+      if (!authToken) {
+        alert('Please set your token first');
+        return;
+      }
+
+      console.log('🗑️ Deleting photo:', photoId);
+
+      try {
+        const response = await fetch(`${API_URL}/users/photos/${photoId}`, {
+          method: 'DELETE',
+          headers: {
+            'Authorization': `Bearer ${authToken}`
+          }
+        });
+
+        const data = await response.json();
+        console.log('📥 Response:', data);
+        
+        if (data.success) {
+          alert('✅ Photo deleted successfully!');
+          loadPhotos();
+        } else {
+          alert('❌ ' + data.message);
+        }
+      } catch (error) {
+        console.error('❌ Error:', error);
+        alert('Error deleting photo: ' + error.message);
+      }
+    }
+
+    async function loadUserProfile() {
+      if (!authToken) {
+        alert('Please set your token first');
+        return;
+      }
+
+      console.log('👤 Loading user profile...');
+
+      try {
+        const response = await fetch(`${API_URL}/users/me`, {
+          headers: {
+            'Authorization': `Bearer ${authToken}`
+          }
+        });
+
+        const data = await response.json();
+        console.log('📥 Profile data:', data);
+        
+        document.getElementById('profileData').textContent = JSON.stringify(data, null, 2);
+        
+        if (!data.success) {
+          alert('❌ ' + data.message);
+        }
+      } catch (error) {
+        console.error('❌ Error loading profile:', error);
+        document.getElementById('profileData').textContent = 'Error: ' + error.message;
+        alert('Error loading profile: ' + error.message);
+      }
+    }
+
+    function showStatus(elementId, message, type) {
+      const element = document.getElementById(elementId);
+      element.innerHTML = `<div class="status-message ${type}">${message}</div>`;
+      setTimeout(() => {
+        element.innerHTML = '';
+      }, 5000);
+    }
+  </script>
+</body>
+</html>

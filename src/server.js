@@ -4,13 +4,12 @@ const app = require("./app");
 const chatController = require("./controllers/chatController");
 const Message = require("./models/Message");
 const Conversation = require("./models/Conversation");
+const Friendship = require("./models/Friendship"); // ✅ AJOUTER
 
 const PORT = process.env.PORT || 5000;
 
-// Create an HTTP server using Express
 const server = http.createServer(app);
 
-// Attache Socket.IO
 const io = new Server(server, {
   cors: {
     origin: "*",
@@ -18,13 +17,10 @@ const io = new Server(server, {
   },
 });
 
-// Expose io to controllers
 app.set("io", io);
 
-// ✅ Track online users
-const onlineUsers = new Map(); // Map<userId, socketId>
+const onlineUsers = new Map();
 
-// Socket.IO management
 io.on("connection", (socket) => {
   console.log("🔌 Socket connecté:", socket.id);
 
@@ -32,8 +28,6 @@ io.on("connection", (socket) => {
   socket.on("userOnline", (userId) => {
     onlineUsers.set(userId.toString(), socket.id);
     console.log(`👤 User ${userId} is now online. Total online: ${onlineUsers.size}`);
-    
-    // Broadcast to all clients that this user is online
     io.emit("userStatusChanged", { userId, isOnline: true });
   });
 
@@ -48,24 +42,35 @@ io.on("connection", (socket) => {
     console.log(`${socket.id} rejoint room ${conversationId}`);
   });
 
+  // ✅ NOUVEAU : Joindre une room pour recevoir les invitations
+  socket.on("joinUserRoom", (userId) => {
+    socket.join(`user_${userId}`);
+    console.log(`${socket.id} rejoint room user_${userId}`);
+  });
+
   socket.on("sendMessage", async (data) => {
     try {
+      // ✅ Vérifier s'ils sont amis avant d'envoyer
+      const senderId = data.senderId || data.sender;
+      const receiverId = data.receiverId || data.receiver;
+      
+      const areFriends = await Friendship.areFriends(senderId, receiverId);
+      if (!areFriends) {
+        socket.emit("error", { message: "Vous devez être amis pour communiquer" });
+        return;
+      }
+
       if (data._id) {
         await Conversation.findByIdAndUpdate(data.conversationId, { lastMessage: data._id });
         
-        // ✅ Check if receiver is online to update status to "delivered"
-        const receiverId = data.receiver?._id || data.receiver || data.receiverId;
         const isReceiverOnline = onlineUsers.has(receiverId.toString());
         
         if (isReceiverOnline) {
-          // Update message status to delivered
           const updatedMessage = await Message.findByIdAndUpdate(
             data._id, 
             { status: "delivered" }, 
             { new: true }
           );
-          
-          // Emit to sender that message was delivered
           io.to(String(data.conversationId)).emit("messageUpdated", updatedMessage);
         }
         
@@ -75,17 +80,14 @@ io.on("connection", (socket) => {
 
       const message = await chatController.saveMessage({
         conversationId: data.conversationId,
-        senderId: data.senderId || data.sender,
-        receiverId: data.receiverId || data.receiver,
+        senderId: senderId,
+        receiverId: receiverId,
         text: data.text,
       });
 
-      // ✅ Check if receiver is online
-      const receiverId = data.receiverId || data.receiver;
       const isReceiverOnline = onlineUsers.has(receiverId.toString());
       
       if (isReceiverOnline) {
-        // Update to delivered immediately
         const updatedMessage = await Message.findByIdAndUpdate(
           message._id, 
           { status: "delivered" }, 
@@ -98,6 +100,7 @@ io.on("connection", (socket) => {
 
     } catch (err) {
       console.error("socket sendMessage error:", err.message);
+      socket.emit("error", { message: err.message });
     }
   });
 
@@ -116,10 +119,8 @@ io.on("connection", (socket) => {
     }
   });
 
-  // ✅ Mark all messages in a conversation as delivered
   socket.on("markConversationDelivered", async ({ conversationId, userId }) => {
     try {
-      // Update all sent messages to delivered for this user
       await Message.updateMany(
         { 
           conversationId: conversationId,
@@ -129,7 +130,6 @@ io.on("connection", (socket) => {
         { status: "delivered" }
       );
       
-      // Notify the conversation
       io.to(String(conversationId)).emit("conversationDelivered", { conversationId });
     } catch (err) {
       console.error("error markConversationDelivered:", err.message);
@@ -139,13 +139,10 @@ io.on("connection", (socket) => {
   socket.on("disconnect", () => {
     console.log("❌ Socket disconnected:", socket.id);
     
-    // ✅ Remove user from online list
     for (const [userId, socketId] of onlineUsers.entries()) {
       if (socketId === socket.id) {
         onlineUsers.delete(userId);
         console.log(`👤 User ${userId} is now offline. Total online: ${onlineUsers.size}`);
-        
-        // Broadcast that this user is offline
         io.emit("userStatusChanged", { userId, isOnline: false });
         break;
       }

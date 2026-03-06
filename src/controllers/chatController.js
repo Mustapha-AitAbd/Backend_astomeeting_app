@@ -1,10 +1,19 @@
 const Conversation = require("../models/Conversation");
 const Message = require("../models/Message");
+const Friendship = require("../models/Friendship"); // ✅ AJOUTER
 
-// ✅ Create a conversation (if it doesn't already exist)
+// ✅ Créer une conversation SEULEMENT si amis
 exports.createConversation = async (req, res) => {
   try {
     const { senderId, receiverId } = req.body;
+
+    // ✅ Vérifier s'ils sont amis
+    const areFriends = await Friendship.areFriends(senderId, receiverId);
+    if (!areFriends) {
+      return res.status(403).json({ 
+        message: "Vous devez être amis pour démarrer une conversation" 
+      });
+    }
 
     let conversation = await Conversation.findOne({
       participants: { $all: [senderId, receiverId] }
@@ -33,15 +42,21 @@ exports.getConversations = async (req, res) => {
   }
 };
 
-// saveMessage (unchanged)
+// ✅ saveMessage - vérifier l'amitié
 exports.saveMessage = async ({ conversationId, senderId, receiverId, text }) => {
+  // ✅ Vérifier s'ils sont amis
+  const areFriends = await Friendship.areFriends(senderId, receiverId);
+  if (!areFriends) {
+    throw new Error("Vous devez être amis pour envoyer un message");
+  }
+
   const message = new Message({ conversationId, sender: senderId, receiver: receiverId, text });
   await message.save();
   await Conversation.findByIdAndUpdate(conversationId, { lastMessage: message._id });
   return message;
 };
 
-// sendMessage via REST - also emits the event if io is available
+// sendMessage via REST
 exports.sendMessage = async (req, res) => {
   try {
     const { conversationId, senderId, receiverId, text } = req.body;
@@ -68,7 +83,7 @@ exports.getMessages = async (req, res) => {
   }
 };
 
-// ✅ Update the status of a message (e.g., read)
+// ✅ Update the status of a message
 exports.updateMessageStatus = async (req, res) => {
   try {
     const { messageId, status } = req.body;

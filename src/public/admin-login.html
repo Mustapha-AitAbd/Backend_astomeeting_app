@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Admin — Syni Control</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;500;600&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:       #070b14;
+    --surface:  #0d1424;
+    --border:   #1a2540;
+    --cyan:     #00d4ff;
+    --cyan-dim: rgba(0,212,255,.12);
+    --amber:    #f59e0b;
+    --red:      #ef4444;
+    --text:     #e2e8f0;
+    --muted:    #4a5568;
+    --success:  #10b981;
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  html,body{height:100%}
+  body{
+    background:var(--bg);
+    font-family:'DM Sans',sans-serif;
+    color:var(--text);
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    overflow:hidden;
+    position:relative;
+  }
+
+  /* grid background */
+  body::before{
+    content:'';
+    position:fixed;inset:0;
+    background-image:
+      linear-gradient(rgba(0,212,255,.04) 1px,transparent 1px),
+      linear-gradient(90deg,rgba(0,212,255,.04) 1px,transparent 1px);
+    background-size:48px 48px;
+    pointer-events:none;
+  }
+
+  /* animated blobs */
+  .blob{
+    position:fixed;
+    border-radius:50%;
+    filter:blur(120px);
+    pointer-events:none;
+    animation:drift 18s ease-in-out infinite alternate;
+  }
+  .blob-1{width:500px;height:500px;background:rgba(0,212,255,.07);top:-10%;left:-10%}
+  .blob-2{width:400px;height:400px;background:rgba(245,158,11,.05);bottom:-10%;right:-5%;animation-delay:-9s}
+  @keyframes drift{from{transform:translate(0,0) scale(1)}to{transform:translate(30px,20px) scale(1.05)}}
+
+  /* scan line */
+  body::after{
+    content:'';
+    position:fixed;inset:0;
+    background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,0,0,.15) 2px,rgba(0,0,0,.15) 4px);
+    pointer-events:none;opacity:.3;
+  }
+
+  .card{
+    position:relative;
+    background:var(--surface);
+    border:1px solid var(--border);
+    border-radius:4px;
+    width:420px;
+    padding:48px 40px 40px;
+    box-shadow:0 0 60px rgba(0,0,0,.6),0 0 120px rgba(0,212,255,.04);
+    animation:slideUp .5s cubic-bezier(.16,1,.3,1) both;
+  }
+  .card::before{
+    content:'';
+    position:absolute;top:0;left:40px;right:40px;
+    height:1px;
+    background:linear-gradient(90deg,transparent,var(--cyan),transparent);
+  }
+  @keyframes slideUp{from{opacity:0;transform:translateY(24px)}to{opacity:1;transform:translateY(0)}}
+
+  .logo{
+    display:flex;align-items:center;gap:10px;margin-bottom:36px;
+  }
+  .logo-icon{
+    width:36px;height:36px;
+    border:1.5px solid var(--cyan);
+    border-radius:4px;
+    display:flex;align-items:center;justify-content:center;
+    position:relative;
+    box-shadow:0 0 12px rgba(0,212,255,.3);
+  }
+  .logo-icon svg{width:18px;height:18px;stroke:var(--cyan);fill:none;stroke-width:1.5}
+  .logo-text{
+    font-family:'Bebas Neue',sans-serif;
+    font-size:22px;
+    letter-spacing:2px;
+    color:var(--text);
+  }
+  .logo-badge{
+    font-family:'JetBrains Mono',monospace;
+    font-size:9px;
+    color:var(--cyan);
+    background:var(--cyan-dim);
+    border:1px solid rgba(0,212,255,.25);
+    padding:2px 6px;
+    border-radius:2px;
+    letter-spacing:1px;
+    margin-left:4px;
+    align-self:flex-end;
+    margin-bottom:2px;
+  }
+
+  h1{
+    font-family:'Bebas Neue',sans-serif;
+    font-size:34px;
+    letter-spacing:2px;
+    line-height:1;
+    margin-bottom:4px;
+  }
+  .subtitle{
+    font-size:13px;color:var(--muted);
+    font-family:'JetBrains Mono',monospace;
+    margin-bottom:32px;
+  }
+
+  .field{margin-bottom:20px}
+  label{
+    display:block;
+    font-size:11px;
+    letter-spacing:1.5px;
+    text-transform:uppercase;
+    color:var(--muted);
+    margin-bottom:8px;
+    font-family:'JetBrains Mono',monospace;
+  }
+  .input-wrap{position:relative}
+  input{
+    width:100%;
+    background:#080d1a;
+    border:1px solid var(--border);
+    border-radius:3px;
+    padding:12px 14px;
+    color:var(--text);
+    font-size:14px;
+    font-family:'DM Sans',sans-serif;
+    outline:none;
+    transition:border-color .2s,box-shadow .2s;
+  }
+  input:focus{
+    border-color:rgba(0,212,255,.5);
+    box-shadow:0 0 0 3px rgba(0,212,255,.08);
+  }
+  input::placeholder{color:var(--muted)}
+
+  .eye-btn{
+    position:absolute;right:12px;top:50%;transform:translateY(-50%);
+    background:none;border:none;cursor:pointer;
+    color:var(--muted);padding:4px;
+    display:flex;align-items:center;
+    transition:color .2s;
+  }
+  .eye-btn:hover{color:var(--cyan)}
+  .eye-btn svg{width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:1.5}
+
+  .btn{
+    width:100%;
+    background:var(--cyan);
+    color:#020812;
+    border:none;
+    border-radius:3px;
+    padding:13px;
+    font-size:13px;
+    font-weight:600;
+    letter-spacing:2px;
+    text-transform:uppercase;
+    cursor:pointer;
+    font-family:'DM Sans',sans-serif;
+    position:relative;
+    overflow:hidden;
+    transition:opacity .2s,transform .1s;
+    margin-top:8px;
+  }
+  .btn:hover{opacity:.9}
+  .btn:active{transform:scale(.99)}
+  .btn:disabled{opacity:.4;cursor:not-allowed}
+  .btn .spinner{
+    display:none;
+    width:16px;height:16px;
+    border:2px solid rgba(2,8,18,.3);
+    border-top-color:#020812;
+    border-radius:50%;
+    animation:spin .7s linear infinite;
+    margin:0 auto;
+  }
+  .btn.loading .label{display:none}
+  .btn.loading .spinner{display:block}
+  @keyframes spin{to{transform:rotate(360deg)}}
+
+  .error-box{
+    display:none;
+    background:rgba(239,68,68,.08);
+    border:1px solid rgba(239,68,68,.3);
+    border-radius:3px;
+    padding:10px 14px;
+    font-size:13px;
+    color:#f87171;
+    margin-bottom:16px;
+    font-family:'JetBrains Mono',monospace;
+  }
+  .error-box.show{display:block;animation:fadeIn .2s ease}
+  @keyframes fadeIn{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:translateY(0)}}
+
+  .footer-meta{
+    margin-top:28px;
+    padding-top:20px;
+    border-top:1px solid var(--border);
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+  }
+  .status-dot{
+    display:flex;align-items:center;gap:6px;
+    font-size:11px;color:var(--muted);
+    font-family:'JetBrains Mono',monospace;
+  }
+  .dot{
+    width:6px;height:6px;border-radius:50%;
+    background:var(--success);
+    box-shadow:0 0 6px var(--success);
+    animation:pulse 2s ease-in-out infinite;
+  }
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+  .version{font-size:11px;color:var(--muted);font-family:'JetBrains Mono',monospace}
+</style>
+</head>
+<body>
+<div class="blob blob-1"></div>
+<div class="blob blob-2"></div>
+
+<div class="card">
+  <div class="logo">
+    <div class="logo-icon">
+      <svg viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+    </div>
+    <span class="logo-text">SYNI</span>
+    <span class="logo-badge">ADMIN</span>
+  </div>
+
+  <h1>Control Panel</h1>
+  <p class="subtitle">// authorized access only</p>
+
+  <div class="error-box" id="errorBox"></div>
+
+  <div class="field">
+    <label>Email Address</label>
+    <input type="email" id="email" placeholder="admin@syni.app" autocomplete="username">
+  </div>
+
+  <div class="field">
+    <label>Password</label>
+    <div class="input-wrap">
+      <input type="password" id="password" placeholder="••••••••••••" autocomplete="current-password">
+      <button class="eye-btn" id="togglePwd" type="button" onclick="togglePassword()">
+        <svg id="eyeIcon" viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+      </button>
+    </div>
+  </div>
+
+  <button class="btn" id="loginBtn" onclick="doLogin()">
+    <span class="label">AUTHENTICATE</span>
+    <div class="spinner"></div>
+  </button>
+
+  <div class="footer-meta">
+    <div class="status-dot"><span class="dot"></span>Server Online</div>
+    <span class="version">v1.0.0</span>
+  </div>
+</div>
+
+<script>
+  // ── utils ──────────────────────────────────────────────
+  const $ = id => document.getElementById(id);
+
+  function showError(msg) {
+    const box = $('errorBox');
+    box.textContent = '! ' + msg;
+    box.classList.add('show');
+  }
+  function hideError() { $('errorBox').classList.remove('show') }
+
+  function setLoading(v) {
+    const btn = $('loginBtn');
+    btn.classList.toggle('loading', v);
+    btn.disabled = v;
+  }
+
+  function togglePassword() {
+    const inp = $('password');
+    const isText = inp.type === 'text';
+    inp.type = isText ? 'password' : 'text';
+    $('eyeIcon').innerHTML = isText
+      ? '<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>'
+      : '<path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/>';
+  }
+
+  // enter key support
+  ['email','password'].forEach(id => {
+    $(id).addEventListener('keydown', e => { if(e.key==='Enter') doLogin() });
+  });
+
+  // ── login ──────────────────────────────────────────────
+  async function doLogin() {
+    hideError();
+    const email    = $('email').value.trim();
+    const password = $('password').value;
+
+    if (!email || !password) { showError('All fields are required'); return; }
+
+    setLoading(true);
+    try {
+      const res  = await fetch('/api/auth/login', {
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ email, password })
+      });
+      const data = await res.json();
+
+      if (!res.ok) { showError(data.message || 'Authentication failed'); return; }
+
+      // ── role check ──────────────────────────────────────
+      const role = data.user?.role;
+      if (role !== 'admin' && role !== 'superadmin') {
+        showError('Access denied — admin privileges required');
+        return;
+      }
+
+      // ── persist session ─────────────────────────────────
+      sessionStorage.setItem('adminToken', data.token);
+      sessionStorage.setItem('adminUser',  JSON.stringify(data.user));
+
+      // ── redirect ─────────────────────────────────────────
+      window.location.href = '/admin-dashboard';
+
+    } catch (err) {
+      showError('Network error — check your connection');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  // ── already logged in? ──────────────────────────────────
+  (function checkSession() {
+    const token = sessionStorage.getItem('adminToken');
+    const user  = JSON.parse(sessionStorage.getItem('adminUser') || 'null');
+    if (token && (user?.role === 'admin' || user?.role === 'superadmin')) {
+      window.location.href = '/admin-dashboard';
+    }
+  })();
+</script>
+</body>
+</html>

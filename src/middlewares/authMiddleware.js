@@ -1,7 +1,7 @@
 const jwt = require('jsonwebtoken');
-const { isTokenValid } = require('../controllers/authController');
+const User = require('../models/User'); // ✅ Ajouter cet import
 
-exports.protect = (req, res, next) => {
+exports.protect = async (req, res, next) => {
   try {
     const authHeader = req.headers.authorization;
     if (!authHeader || !authHeader.startsWith('Bearer '))
@@ -9,13 +9,18 @@ exports.protect = (req, res, next) => {
 
     const token = authHeader.split(' ')[1];
 
+    // Vérifier le token
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
     
-    if (isTokenValid && typeof isTokenValid === 'function') {
-      isTokenValid(req, res, () => {}); 
+    // ✅ AMÉLIORATION: Récupérer l'utilisateur complet depuis la DB
+    const user = await User.findById(decoded.id).select('-password');
+    
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
     }
 
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    req.user = { id: decoded.id };
+    // ✅ Attacher l'utilisateur complet à req.user
+    req.user = user;
     next();
   } catch (err) {
     res.status(401).json({ message: 'Invalid or expired token' });

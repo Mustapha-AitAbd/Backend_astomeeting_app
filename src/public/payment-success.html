@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Payment Successful</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: white;
+            border-radius: 20px;
+            padding: 50px 40px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            text-align: center;
+            max-width: 500px;
+            width: 100%;
+            animation: slideUp 0.5s ease-out;
+        }
+
+        @keyframes slideUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .success-icon {
+            width: 80px;
+            height: 80px;
+            background: linear-gradient(135deg, #4CAF50 0%, #45a049 100%);
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin: 0 auto 30px;
+            animation: scaleIn 0.6s ease-out 0.2s both;
+        }
+
+        @keyframes scaleIn {
+            from {
+                transform: scale(0);
+            }
+            to {
+                transform: scale(1);
+            }
+        }
+
+        .checkmark {
+            width: 40px;
+            height: 40px;
+            border: 4px solid white;
+            border-radius: 50%;
+            position: relative;
+        }
+
+        .checkmark::after {
+            content: '';
+            position: absolute;
+            left: 8px;
+            top: 3px;
+            width: 12px;
+            height: 20px;
+            border: solid white;
+            border-width: 0 4px 4px 0;
+            transform: rotate(45deg);
+        }
+
+        h1 {
+            color: #2c3e50;
+            font-size: 32px;
+            margin-bottom: 15px;
+            font-weight: 700;
+        }
+
+        .subtitle {
+            color: #7f8c8d;
+            font-size: 18px;
+            margin-bottom: 30px;
+            line-height: 1.6;
+        }
+
+        .info-box {
+            background: #f8f9fa;
+            border-radius: 12px;
+            padding: 25px;
+            margin: 30px 0;
+            text-align: left;
+        }
+
+        .info-item {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 15px;
+            padding-bottom: 15px;
+            border-bottom: 1px solid #e9ecef;
+        }
+
+        .info-item:last-child {
+            margin-bottom: 0;
+            padding-bottom: 0;
+            border-bottom: none;
+        }
+
+        .info-label {
+            color: #7f8c8d;
+            font-size: 14px;
+            font-weight: 500;
+        }
+
+        .info-value {
+            color: #2c3e50;
+            font-size: 14px;
+            font-weight: 600;
+        }
+
+        .premium-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            background: linear-gradient(135deg, #FFD700 0%, #FFA500 100%);
+            color: #fff;
+            padding: 12px 24px;
+            border-radius: 25px;
+            font-weight: 700;
+            font-size: 16px;
+            margin: 20px 0;
+            box-shadow: 0 4px 15px rgba(255, 215, 0, 0.4);
+        }
+
+        .crown-icon {
+            font-size: 20px;
+        }
+
+        .features {
+            text-align: left;
+            margin: 25px 0;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 12px;
+        }
+
+        .features h3 {
+            color: #2c3e50;
+            font-size: 16px;
+            margin-bottom: 15px;
+            font-weight: 600;
+        }
+
+        .feature-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 10px;
+            color: #495057;
+            font-size: 14px;
+        }
+
+        .check-icon {
+            color: #4CAF50;
+            font-size: 18px;
+            flex-shrink: 0;
+        }
+
+        .note {
+            background: #e3f2fd;
+            border-left: 4px solid #2196F3;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 25px 0;
+            text-align: left;
+        }
+
+        .note p {
+            color: #1565c0;
+            font-size: 14px;
+            line-height: 1.6;
+            margin: 0;
+        }
+
+        .countdown {
+            color: #7f8c8d;
+            font-size: 14px;
+            margin-top: 30px;
+        }
+
+        .countdown strong {
+            color: #667eea;
+            font-size: 18px;
+        }
+
+        @media (max-width: 600px) {
+            .container {
+                padding: 40px 25px;
+            }
+
+            h1 {
+                font-size: 26px;
+            }
+
+            .subtitle {
+                font-size: 16px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="success-icon">
+            <div class="checkmark"></div>
+        </div>
+
+        <h1>Payment Successful!</h1>
+        <p class="subtitle">
+            Your premium subscription has been activated successfully.
+        </p>
+
+        <div class="premium-badge">
+            <span class="crown-icon">👑</span>
+            You are now Premium!
+        </div>
+
+        <div class="info-box">
+            <div class="info-item">
+                <span class="info-label">Status</span>
+                <span class="info-value" style="color: #4CAF50;">✓ Active</span>
+            </div>
+            <div class="info-item">
+                <span class="info-label">Transaction</span>
+                <span class="info-value">Completed</span>
+            </div>
+            <div class="info-item">
+                <span class="info-label">Payment Method</span>
+                <span class="info-value">PayPal / Card</span>
+            </div>
+        </div>
+
+        <div class="features">
+            <h3>🎉 Premium Features Unlocked:</h3>
+            <div class="feature-item">
+                <span class="check-icon">✓</span>
+                <span>Unlimited friend requests</span>
+            </div>
+            <div class="feature-item">
+                <span class="check-icon">✓</span>
+                <span>Advanced search filters</span>
+            </div>
+            <div class="feature-item">
+                <span class="check-icon">✓</span>
+                <span>Priority customer support</span>
+            </div>
+            <div class="feature-item">
+                <span class="check-icon">✓</span>
+                <span>Certified badge on profile</span>
+            </div>
+            <div class="feature-item">
+                <span class="check-icon">✓</span>
+                <span>Boosted profile visibility</span>
+            </div>
+        </div>
+
+        <div class="note">
+            <p>
+                <strong>📱 Note:</strong> Please return to the app and refresh your profile to see your premium features. A confirmation email has been sent to your inbox.
+            </p>
+        </div>
+
+        <div class="countdown">
+            This page will close automatically in <strong id="countdown">10</strong> seconds...
+        </div>
+    </div>
+
+    <script>
+        let seconds = 10;
+        const countdownElement = document.getElementById('countdown');
+        
+        const interval = setInterval(() => {
+            seconds--;
+            countdownElement.textContent = seconds;
+            
+            if (seconds <= 0) {
+                clearInterval(interval);
+                window.close();
+            }
+        }, 1000);
+    </script>
+</body>
+</html>

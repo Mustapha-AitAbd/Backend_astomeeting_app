@@ -14,20 +14,38 @@ let blacklistedTokens = new Set();
 // ============= REGISTER WITH EMAIL VERIFICATION =============
 exports.register = async (req, res, next) => {
   try {
-    const { name, email, password, dateOfBirth, gender } = req.body;
-    
+    const { name, email, password, dateOfBirth, gender, disclaimerAccepted } = req.body;
+
     // Validation de base
     if (!email || !password) {
       return res.status(400).json({ message: 'Email and password are required' });
     }
 
+    // ✅ Consent validation — required for compliance
+    if (!disclaimerAccepted) {
+      return res.status(400).json({ message: 'You must accept the Terms and Conditions to register' });
+    }
+
     const exists = await User.findOne({ email });
     if (exists) return res.status(400).json({ message: 'Email already used' });
+
+    // ✅ Extract IP address from request
+    // Handles proxies (nginx, load balancers) via x-forwarded-for header
+    const rawIp =
+      req.headers['x-forwarded-for']?.split(',')[0]?.trim() ||
+      req.headers['x-real-ip'] ||
+      req.socket?.remoteAddress ||
+      'unknown';
+
+    // Normalize IPv6 loopback to readable IPv4
+    const ipAddress = rawIp === '::1' ? '127.0.0.1' : rawIp;
+
+    // ✅ Extract User-Agent for device fingerprinting
+    const userAgent = req.headers['user-agent'] || 'unknown';
 
     // Generate 6-digit verification code
     const verificationCode = Math.floor(100000 + Math.random() * 900000).toString();
 
-    // Utiliser des valeurs par défaut si non fournies
     const userData = {
       email,
       password,
@@ -36,13 +54,21 @@ exports.register = async (req, res, next) => {
       gender: gender || 'other',
       emailVerificationCode: verificationCode,
       emailVerificationExpires: Date.now() + 3600000, // 1 hour
-      emailVerified: false
+      emailVerified: false,
+
+      // ✅ Store full consent audit trail
+      consentLog: {
+        acceptedAt: new Date(),       // Server-side timestamp (trustworthy)
+        ipAddress,
+        userAgent,
+        version: '1.0',               // Bump this when T&C change
+      },
     };
 
     const user = await User.create(userData);
     const token = signToken(user._id);
 
-    // Send verification email
+    // Send verification email (unchanged)
     try {
       await transporter.sendMail({
         from: process.env.EMAIL_USER,
@@ -63,22 +89,22 @@ exports.register = async (req, res, next) => {
         `,
         text: `Welcome to Syni! Your verification code is: ${verificationCode}. This code will expire in 1 hour.`
       });
-
-      console.log('Verification email sent to:', user.email);
     } catch (emailError) {
       console.error('Failed to send verification email:', emailError);
-      // Ne pas bloquer l'inscription si l'email échoue
     }
+
+    // ✅ Log for server-side audit trail
+    console.log(`[CONSENT] User ${user.email} accepted T&C at ${userData.consentLog.acceptedAt.toISOString()} from IP ${ipAddress}`);
 
     res.status(201).json({
       token,
-      user: { 
-        id: user._id, 
-        name: user.name, 
+      user: {
+        id: user._id,
+        name: user.name,
         email: user.email,
-        emailVerified: user.emailVerified
+        emailVerified: user.emailVerified,
       },
-      message: 'Registration successful. Please check your email for verification code.'
+      message: 'Registration successful. Please check your email for verification code.',
     });
   } catch (err) {
     next(err);
@@ -174,6 +200,7 @@ exports.resendVerificationCode = async (req, res, next) => {
   }
 };
 
+
 exports.login = async (req, res, next) => {
   try {
     const { email, password } = req.body;
@@ -184,20 +211,20 @@ exports.login = async (req, res, next) => {
     if (!ok) return res.status(401).json({ message: 'Invalid credentials' });
 
     const token = signToken(user._id);
-    res.json({ 
+    res.json({
       token,
       user: {
-        id: user._id,
-        name: user.name,
-        email: user.email,
-        emailVerified: user.emailVerified
+        id:            user._id,
+        name:          user.name,
+        email:         user.email,
+        emailVerified: user.emailVerified,
+        role:          user.role,          // ← ADD THIS LINE
       }
     });
   } catch (err) {
     next(err);
   }
 };
-
 // ---------------- Other functions ----------------
 
 // Logout: invalidate the token
@@ -257,6 +284,7 @@ exports.isTokenValid = async (req, res, next) => {
     
     res.status(500).json({ message: 'Token validation failed' });
   }
+  next();
 };
 
 // ✅ Function to add token to blacklist (for logout)
@@ -386,42 +414,109 @@ exports.verifyEmail = async (req, res, next) => {
   }
 };
 
-// ✅ NOUVELLE FONCTION - À AJOUTER ICI
+
 exports.completeProfile = async (req, res) => {
   try {
-    const { registrationMethod, firstName, lastName, age, country, gender } = req.body;
+    const {
+      registrationMethod,
+      firstName,
+      lastName,
+      dateOfBirth,
+      country,
+      city,   // ← NEW: optional city field
+      gender,
+    } = req.body;
 
-    if (!firstName || !lastName || !age || !country || !gender) {
-      return res.status(400).json({ 
+    // ── Validate required fields ──────────────────────────────────────────
+    if (!firstName || !lastName || !dateOfBirth || !country || !gender) {
+      return res.status(400).json({
         success: false,
-        message: 'All fields are required' 
+        message: 'All required fields must be provided (firstName, lastName, dateOfBirth, country, gender)',
       });
     }
+
+    // ── Validate city if provided ─────────────────────────────────────────
+    if (city !== undefined && city !== null) {
+      if (typeof city !== 'string') {
+        return res.status(400).json({ success: false, message: 'City must be a string' });
+      }
+      const trimmedCity = city.trim();
+      if (trimmedCity.length > 100) {
+        return res.status(400).json({ success: false, message: 'City name is too long (max 100 characters)' });
+      }
+    }
+
+    // ── Parse & validate date ─────────────────────────────────────────────
+    const birthDate = new Date(dateOfBirth);
+    if (isNaN(birthDate.getTime())) {
+      return res.status(400).json({ success: false, message: 'Invalid date of birth format' });
+    }
+
+    const day   = birthDate.getUTCDate();
+    const month = birthDate.getUTCMonth(); // 0-indexed
+    const year  = birthDate.getUTCFullYear();
+    const hours   = birthDate.getUTCHours();
+    const minutes = birthDate.getUTCMinutes();
+    const seconds = birthDate.getUTCSeconds();
+
+    console.log('📅 Date received:', {
+      original: dateOfBirth,
+      parsed: birthDate,
+      components: { day, month: month + 1, year, hours, minutes, seconds },
+    });
+
+    // ── Age checks ────────────────────────────────────────────────────────
+    const today = new Date();
+    let age = today.getFullYear() - year;
+    const monthDiff = today.getMonth() - month;
+    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < day)) age--;
 
     if (age < 18) {
-      return res.status(400).json({ 
-        success: false,
-        message: 'You must be at least 18 years old' 
-      });
+      return res.status(400).json({ success: false, message: 'You must be at least 18 years old' });
+    }
+    if (birthDate > today) {
+      return res.status(400).json({ success: false, message: 'Date of birth cannot be in the future' });
+    }
+    if (age > 120) {
+      return res.status(400).json({ success: false, message: 'Please enter a valid date of birth' });
     }
 
+    // ── Build the update payload ──────────────────────────────────────────
     const userId = req.user.id || req.user._id;
-    const User = require('../models/User');
+    const User   = require('../models/User');
+
+    const dateToSave = new Date(dateOfBirth);
+
+    console.log('💾 Date to save:', {
+      dateToSave,
+      isoString: dateToSave.toISOString(),
+      day:   dateToSave.getUTCDate(),
+      month: dateToSave.getUTCMonth() + 1,
+      year:  dateToSave.getUTCFullYear(),
+      time:  `${dateToSave.getUTCHours()}:${dateToSave.getUTCMinutes()}:${dateToSave.getUTCSeconds()}`,
+    });
+
+    // Build $set object — only include city if it was actually provided
+    const updateFields = {
+      registrationMethod: registrationMethod || 'email',
+      firstName,
+      lastName,
+      dateOfBirth: dateToSave,
+      country,
+      gender,
+      name: `${firstName} ${lastName}`,
+      profileCompleted: true,
+    };
+
+    // ── NEW: conditionally persist city ───────────────────────────────────
+    if (city !== undefined && city !== null && city.trim() !== '') {
+      updateFields.city = city.trim();
+    }
+    // ─────────────────────────────────────────────────────────────────────
 
     const updatedUser = await User.findByIdAndUpdate(
       userId,
-      {
-        $set: {
-          registrationMethod: registrationMethod || 'email',
-          firstName,
-          lastName,
-          age,
-          country,
-          gender,
-          name: `${firstName} ${lastName}`,
-          profileCompleted: true
-        }
-      },
+      { $set: updateFields },
       { new: true, runValidators: true }
     ).select('-password -__v');
 
@@ -429,17 +524,135 @@ exports.completeProfile = async (req, res) => {
       return res.status(404).json({ success: false, message: 'User not found' });
     }
 
-    res.status(200).json({
+    console.log('✅ User updated:', {
+      userId:         updatedUser._id,
+      dateOfBirth:    updatedUser.dateOfBirth,
+      dateOfBirthISO: updatedUser.dateOfBirth.toISOString(),
+      country:        updatedUser.country,
+      city:           updatedUser.city,   // ← NEW
+      calculatedAge:  age,
+    });
+
+    return res.status(200).json({
       success: true,
       message: 'Profile completed successfully',
-      data: updatedUser
+      data: updatedUser,
+    });
+  } catch (error) {
+    console.error('❌ Error completing profile:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Error completing profile',
+      error: error.message,
+    });
+  }
+};
+
+exports.updateUserLocation = async (req, res, next) => {
+  try {
+    const { latitude, longitude } = req.body;
+
+    // ❌ AVANT — sans return, le code continue après la réponse
+    // if (latitude === undefined || longitude === undefined) {
+    //   res.status(400).json({ ... })   ← envoie réponse 1
+    // }
+    // ... code continue et envoie réponse 2 ❌
+
+    // ✅ APRÈS — return arrête l'exécution
+    if (latitude === undefined || longitude === undefined) {
+      return res.status(400).json({ 
+        success: false,
+        message: 'Latitude and longitude are required' 
+      });
+    }
+
+    if (latitude < -90 || latitude > 90) {
+      return res.status(400).json({   // ← return obligatoire
+        success: false,
+        message: 'Latitude must be between -90 and 90' 
+      });
+    }
+
+    if (longitude < -180 || longitude > 180) {
+      return res.status(400).json({   // ← return obligatoire
+        success: false,
+        message: 'Longitude must be between -180 and 180' 
+      });
+    }
+
+    const userId = req.user.id || req.user._id;
+
+    const updatedUser = await User.findByIdAndUpdate(
+      userId,
+      {
+        $set: {
+          location: {
+            type: 'Point',
+            coordinates: [longitude, latitude]
+          }
+        }
+      },
+      { new: true, runValidators: false }  // ← runValidators: false pour éviter le bug schéma
+    ).select('-password -__v');
+
+    if (!updatedUser) {
+      return res.status(404).json({   // ← return obligatoire
+        success: false,
+        message: 'User not found' 
+      });
+    }
+
+    // ✅ Réponse finale — une seule fois
+    return res.status(200).json({
+      success: true,
+      message: 'Location updated successfully',
+      data: {
+        id: updatedUser._id,
+        name: updatedUser.name,
+        email: updatedUser.email,
+        location: updatedUser.location
+      }
     });
 
   } catch (error) {
-    console.error('Error:', error);
+    console.error('Error updating location:', error);
+    
+    // ✅ Vérifier que la réponse n'a pas déjà été envoyée
+    if (!res.headersSent) {
+      return res.status(500).json({ 
+        success: false,
+        message: 'Error updating location',
+        error: error.message 
+      });
+    }
+  }
+};
+
+// ============= GET USER INFO BY TOKEN =============
+exports.getUserByToken = async (req, res, next) => {
+  try {
+    // L'utilisateur est déjà attaché à req.user par le middleware isTokenValid
+    const userId = req.user.id || req.user._id;
+
+    const user = await User.findById(userId).select('-password -__v');
+
+    if (!user) {
+      return res.status(404).json({ 
+        success: false,
+        message: 'User not found' 
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      data: user
+    });
+
+  } catch (error) {
+    console.error('Error fetching user:', error);
     res.status(500).json({ 
       success: false,
-      message: 'Error completing profile',
+      message: 'Error fetching user',
       error: error.message 
     });
   }

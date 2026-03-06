@@ -2,27 +2,77 @@
 const express = require('express');
 const router = express.Router();
 const verifyToken = require('../middlewares/auth');
-const { 
-  getMe, 
-  updateMe, 
-  getNearbyUsers,  // ✅ IMPORTER CETTE FONCTION
-  getUserById, 
-  getAllUsers 
+const { upload } = require('../config/cloudinary');
+
+const {
+  getMe,
+  updateMe,
+  getNearbyUsers,
+  getUserById,
+  getAllUsers,
+  addProfilePhoto,
+  setMainPhoto,
+  updateProfilePhoto,
+  deleteProfilePhoto,
+  getMyPhotos,
+  getUserDetails,
+  getProfile,
+  updateProfile,
+  // 🔗 Social links
+  getSocialLinks,
+  addSocialLink,
+  updateSocialLink,
+  deleteSocialLink,
+   bulkAddSocialLinks  
 } = require('../controllers/userController');
 
-// Get current user profile
-router.get('/me', verifyToken, getMe);
+// Multer middleware helper (reusable)
+const handleUpload = (req, res, next) => {
+  upload.single('photo')(req, res, (err) => {
+    if (err) {
+      return res.status(400).json({ success: false, message: err.message });
+    }
+    next();
+  });
+};
 
-// Update current user profile
-router.put('/me', verifyToken, updateMe);
+// ─────────────────────────────────────────────
+//  SPECIFIC ROUTES FIRST (before /:id)
+// ─────────────────────────────────────────────
 
-// ✅ Get nearby users (avec la fonction importée)
-router.get('/nearby', verifyToken, getNearbyUsers);
+// Current user
+router.get('/me',      verifyToken, getMe);
+router.put('/me',      verifyToken, updateMe);
 
-// Get user by ID
-router.get('/:id', verifyToken, getUserById);
+// Search
+router.get('/search',  verifyToken, getUserDetails);
 
-// Get all users
+// Nearby
+router.get('/nearby',  verifyToken, getNearbyUsers);
+
+// Profile (structured fields)
+router.get('/profile', verifyToken, getProfile);
+router.put('/profile', verifyToken, updateProfile);
+
+// ─── 🔗 Social Links ──────────────────────────
+router.post('/social-links/bulk', verifyToken, bulkAddSocialLinks);
+router.get   ('/social-links',          verifyToken, getSocialLinks);
+router.post  ('/social-links',          verifyToken, addSocialLink);
+router.put   ('/social-links/:linkId',  verifyToken, updateSocialLink);
+router.delete('/social-links/:linkId',  verifyToken, deleteSocialLink);
+// ──────────────────────────────────────────────
+
+// Photos
+router.get   ('/photos',                verifyToken, getMyPhotos);
+router.post  ('/photos',                verifyToken, handleUpload, addProfilePhoto);
+router.put   ('/photos/profile',        verifyToken, handleUpload, updateProfilePhoto);
+router.put   ('/photos/:photoId/main',  verifyToken, setMainPhoto);
+router.delete('/photos/:photoId',       verifyToken, deleteProfilePhoto);
+
+// All users
 router.get('/', verifyToken, getAllUsers);
+
+// ─── ⚠️ Dynamic route LAST ────────────────────
+router.get('/:id', verifyToken, getUserById);
 
 module.exports = router;
