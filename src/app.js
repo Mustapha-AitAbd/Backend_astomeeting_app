@@ -22,7 +22,7 @@ app.post(
 );
 
 // === Global middlewares ===
-app.use(require('./middlewares/ngrokBypass')); 
+
 app.use(cors());
 app.use(morgan('dev'));
 app.use(express.json());
