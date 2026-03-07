@@ -25,6 +25,8 @@
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.5",
     "dotenv": "^17.2.2",
+    "expo-file-system": "^55.0.10",
+    "expo-sharing": "^55.0.11",
     "express": "^5.1.0",
     "express-validator": "^7.2.1",
     "google-auth-library": "^10.3.0",

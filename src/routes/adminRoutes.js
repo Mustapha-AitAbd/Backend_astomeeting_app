@@ -1,89 +1,67 @@
-const express   = require('express');
-const router    = express.Router();
-const verifyToken = require('../middlewares/auth');
-const isAdmin   = require('../middlewares/isAdmin');   // create below if missing
+// src/routes/adminRoutes.js
+const express         = require('express');
+const router          = express.Router();
+const verifyToken     = require('../middlewares/auth');
+const isAdmin         = require('../middlewares/isAdmin');
 const adminController = require('../controllers/adminController');
 
-router.use(verifyToken, isAdmin);  // protect all admin routes
-
-// ==================== ROUTES USERS ====================
-
-// GET /api/admin/users - Liste tous les utilisateurs avec pagination, filtres et recherche
-router.get('/users', adminController.getAllUsers);
-
-// GET /api/admin/users/:id - Récupère un utilisateur par ID (avec infos Stripe)
-router.get('/users/:id', adminController.getUserById);
-
-// POST /api/admin/users - Crée un nouvel utilisateur
-router.post('/users', adminController.createUser);
-
-// PUT /api/admin/users/:id - Met à jour un utilisateur
-router.put('/users/:id', adminController.updateUser);
-
-// DELETE /api/admin/users/:id - Supprime un utilisateur (+ annulation Stripe)
-router.delete('/users/:id', adminController.deleteUser);
-
-// ==================== GESTION DES COMPTES ====================
-
-// PUT /api/admin/users/:id/password - Change le mot de passe d'un utilisateur
-router.put('/users/:id/password', adminController.updateUserPassword);
-
-// PUT /api/admin/users/:id/verify-email - Vérifie manuellement l'email
-router.put('/users/:id/verify-email', adminController.verifyUserEmail);
+// ─────────────────────────────────────────────────────────────────────────────
+// SELF-SERVICE routes — any authenticated user (verifyToken only, NO isAdmin)
+// Must be declared BEFORE router.use(verifyToken, isAdmin) so the isAdmin
+// middleware does not block regular users.
+// ─────────────────────────────────────────────────────────────────────────────
+router.delete('/account',          verifyToken, adminController.requestAccountDeletion);
+router.post('/account/restore',    verifyToken, adminController.cancelAccountDeletion);
+router.get('/account/status',      verifyToken, adminController.getDeletionStatus);
+router.get('/my-export',           verifyToken, adminController.exportMyData);       // /api/admin/my-export
+router.post('/withdraw-consent',   verifyToken, adminController.withdrawConsent);
 
 
+// ── NEW ──────────────────────────────────────────────────────────────────────
+router.get('/consent-status',          verifyToken, adminController.getConsentStatus);
+router.post('/cancel-withdraw-consent', verifyToken, adminController.cancelWithdrawConsent);
+// ─────────────────────────────────────────────────────────────────────────────
 
-// POST /api/admin/users/bulk-delete - Supprime plusieurs utilisateurs
-router.post('/users/bulk-delete', adminController.bulkDeleteUsers);
+// ─────────────────────────────────────────────────────────────────────────────
+// ADMIN-ONLY routes — all routes below require verifyToken + isAdmin
+// ─────────────────────────────────────────────────────────────────────────────
+router.use(verifyToken, isAdmin);
 
-// ==================== GESTION DES ABONNEMENTS ====================
+// ── Users ─────────────────────────────────────────────────────────────────────
+router.get('/users',                    adminController.getAllUsers);
+router.get('/users/:id',                adminController.getUserById);
+router.post('/users',                   adminController.createUser);
+router.put('/users/:id',                adminController.updateUser);
+router.delete('/users/:id',             adminController.deleteUser);
 
-// PUT /api/admin/users/:id/subscription - Met à jour l'abonnement
-router.put('/users/:id/subscription', adminController.updateUserSubscription);
+// ── Account management ────────────────────────────────────────────────────────
+router.put('/users/:id/password',       adminController.updateUserPassword);
+router.put('/users/:id/verify-email',   adminController.verifyUserEmail);
+router.post('/users/bulk-delete',       adminController.bulkDeleteUsers);
 
-// POST /api/admin/users/:id/cancel-subscription - Annule l'abonnement Stripe
+// ── Subscriptions ─────────────────────────────────────────────────────────────
+router.put('/users/:id/subscription',         adminController.updateUserSubscription);
 router.post('/users/:id/cancel-subscription', adminController.cancelSubscription);
 
-// ==================== GESTION DES PHOTOS ====================
+// ── Photos ────────────────────────────────────────────────────────────────────
+router.get('/users/:id/photos',               adminController.getUserPhotos);
+router.delete('/users/:id/photos/:photoId',   adminController.deleteUserPhoto);
 
-// GET /api/admin/users/:id/photos - Récupère les photos d'un utilisateur
-router.get('/users/:id/photos', adminController.getUserPhotos);
+// ── Preferences ───────────────────────────────────────────────────────────────
+router.get('/users/:id/preferences',    adminController.getUserPreferences);
+router.put('/users/:id/preferences',    adminController.updateUserPreferences);
 
-// DELETE /api/admin/users/:id/photos/:photoId - Supprime une photo
-router.delete('/users/:id/photos/:photoId', adminController.deleteUserPhoto);
+// ── Moderation ────────────────────────────────────────────────────────────────
+router.post('/moderate-image',          adminController.moderateImage);
 
-router.delete('/users/:id/photos/:photoId', adminController.deleteUserPhoto);  // ← ADD
+// ── Payments ──────────────────────────────────────────────────────────────────
+router.get('/users/:id/payments',       adminController.getPaymentHistory);
+router.get('/invoices',                 adminController.getInvoices);
 
-// ==================== GESTION DES PRÉFÉRENCES ====================
-
-// GET /api/admin/users/:id/preferences - Récupère les préférences
-router.get('/users/:id/preferences', adminController.getUserPreferences);
-
-// PUT /api/admin/users/:id/preferences - Met à jour les préférences
-router.put('/users/:id/preferences', adminController.updateUserPreferences);
-
-// Image moderation proxy
-router.post('/moderate-image',  adminController.moderateImage);  // ← ADD
-
-// ==================== PAIEMENTS & FACTURES ====================
-
-// GET /api/admin/users/:id/payments - Historique des paiements d'un utilisateur
-router.get('/users/:id/payments', adminController.getPaymentHistory);
-
-// GET /api/admin/invoices - Liste toutes les factures (tous utilisateurs)
-router.get('/invoices', adminController.getInvoices);
-
-// ==================== STATISTIQUES & RAPPORTS ====================
-
-// GET /api/admin/statistics - Statistiques globales détaillées
-router.get('/statistics', adminController.getStatistics);
-
-// GET /api/admin/search/advanced - Recherche avancée avec filtres multiples
-router.get('/search/advanced', adminController.advancedSearch);
-
-// GET /api/admin/export - Exporte les données utilisateurs (JSON ou CSV)
-router.get('/export', adminController.exportUsers);
-
-router.get('/overview-stats', adminController.getOverviewStats);
+// ── Stats & reports ───────────────────────────────────────────────────────────
+router.get('/statistics',               adminController.getStatistics);
+router.get('/search/advanced',          adminController.advancedSearch);
+router.get('/export',                   adminController.exportUsers);   // admin bulk export
+router.get('/overview-stats',           adminController.getOverviewStats);
 
 module.exports = router;

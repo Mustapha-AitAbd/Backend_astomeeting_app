@@ -1,7 +1,9 @@
+// src/controllers/adminController.js
 const User = require('../models/User');
 const bcrypt = require('bcryptjs');
 const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 const axios   = require('axios'); 
+const generateExportHTML = require('../utils/exportTemplate'); // adjust path if needed
 
 // ==================== GET ALL USERS ====================
 exports.getAllUsers = async (req, res) => {
@@ -900,5 +902,330 @@ exports.getOverviewStats = async (req, res, next) => {
     });
   } catch (err) {
     next(err);
+  }
+};
+
+// ==================== REQUEST ACCOUNT DELETION ====================
+exports.requestAccountDeletion = async (req, res) => {
+  try {
+    const userId = req.user?.id || req.user?._id;
+    if (!userId) return res.status(401).json({ success: false, message: 'Unauthorized' });
+
+    const user = await User.findById(userId);
+    if (!user) return res.status(404).json({ success: false, message: 'User not found' });
+
+    if (user.isDeleted) {
+      const permanentDeletionAt = new Date(
+        user.deletedAt.getTime() + 30 * 24 * 60 * 60 * 1000
+      );
+      return res.status(400).json({
+        success: false,
+        message: 'Account is already scheduled for deletion',
+        deletedAt: user.deletedAt,
+        permanentDeletionAt
+      });
+    }
+
+    // Cancel active Stripe subscriptions immediately
+    if (user.subscription?.stripeCustomerId) {
+      try {
+        const subs = await stripe.subscriptions.list({
+          customer: user.subscription.stripeCustomerId,
+          status: 'active'
+        });
+        for (const sub of subs.data) {
+          await stripe.subscriptions.cancel(sub.id);
+        }
+      } catch (stripeErr) {
+        console.error('Stripe cancellation error:', stripeErr);
+      }
+    }
+
+    const now = new Date();
+    const permanentDeletionAt = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+
+    // NOTE: findByIdAndUpdate bypasses pre-save hooks but NOT pre-find hooks.
+    // We use it directly here — it will find the user because at this point
+    // isDeleted is still false, which passes the pre-find filter.
+    await User.findByIdAndUpdate(userId, {
+      isDeleted:             true,
+      deletedAt:             now,
+      consentWithdrawn:      true,
+      consentWithdrawnAt:    now,
+      'subscription.active': false,
+      'subscription.plan':   'free',
+    });
+
+    res.json({
+      success: true,
+      message: 'Your account has been scheduled for deletion. You have 30 days to cancel this request.',
+      deletedAt: now,
+      permanentDeletionAt,
+      daysRemaining: 30,
+    });
+    // ⚠️  Frontend should NOT call logout() here.
+    // The user stays logged in with their token for 30 days
+    // so they can restore their account from the settings screen.
+  } catch (error) {
+    console.error('Error requestAccountDeletion:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// ==================== CANCEL ACCOUNT DELETION ====================
+exports.cancelAccountDeletion = async (req, res) => {
+  try {
+    const userId = req.user?.id || req.user?._id;
+    if (!userId) return res.status(401).json({ success: false, message: 'Unauthorized' });
+
+    // IMPORTANT: pass isDeleted:true explicitly so the pre-find middleware
+    // does NOT exclude this document from the query.
+    const user = await User.findOne({ _id: userId, isDeleted: true });
+
+    if (!user) {
+      // Either doesn't exist, or wasn't deleted at all
+      const exists = await User.findById(userId);
+      if (!exists) return res.status(404).json({ success: false, message: 'User not found' });
+      return res.status(400).json({ success: false, message: 'Account is not scheduled for deletion' });
+    }
+
+    const gracePeriodEnd = new Date(
+      user.deletedAt.getTime() + 30 * 24 * 60 * 60 * 1000
+    );
+    if (new Date() > gracePeriodEnd) {
+      return res.status(400).json({
+        success: false,
+        message: 'Grace period has expired. Account cannot be restored.'
+      });
+    }
+
+    // Restore — use updateOne with the explicit filter so the pre-find hook
+    // doesn't interfere.
+    await User.updateOne(
+      { _id: userId, isDeleted: true },
+      {
+        $set: {
+          isDeleted:          false,
+          deletedAt:          null,
+          consentWithdrawn:   false,
+          consentWithdrawnAt: null,
+        }
+      }
+    );
+
+    res.json({ success: true, message: 'Account deletion cancelled successfully. Your account has been restored.' });
+  } catch (error) {
+    console.error('Error cancelAccountDeletion:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// ==================== GET MY DELETION STATUS ====================
+exports.getDeletionStatus = async (req, res) => {
+  try {
+    const userId = req.user?.id || req.user?._id;
+    if (!userId) return res.status(401).json({ success: false, message: 'Unauthorized' });
+
+    // Check both active AND deleted documents so the status always returns correctly
+    // even during the grace period when the user re-logs in.
+    const user = await User.findOne({
+      _id: userId,
+      isDeleted: { $in: [true, false] }   // explicit → bypasses pre-find filter
+    }).select('isDeleted deletedAt');
+
+    if (!user) return res.status(404).json({ success: false, message: 'User not found' });
+
+    if (!user.isDeleted) {
+      return res.json({ success: true, isScheduled: false });
+    }
+
+    const permanentDeletionAt = new Date(
+      user.deletedAt.getTime() + 30 * 24 * 60 * 60 * 1000
+    );
+    const daysRemaining = Math.max(
+      0,
+      Math.ceil((permanentDeletionAt - new Date()) / (1000 * 60 * 60 * 24))
+    );
+
+    res.json({
+      success: true,
+      isScheduled: true,
+      deletedAt: user.deletedAt,
+      permanentDeletionAt,
+      daysRemaining,
+    });
+  } catch (error) {
+    console.error('Error getDeletionStatus:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+
+// ==================== EXPORT MY DATA (HTML) ====================
+exports.exportMyData = async (req, res) => {
+  try {
+    const userId = req.user?.id || req.user?._id;
+    if (!userId) return res.status(401).json({ success: false, message: 'Unauthorized' });
+
+    const user = await User.findOne({
+      _id:       userId,
+      isDeleted: { $in: [true, false] }
+    })
+      .select('-password -emailVerificationCode -resetPasswordCode -phoneVerificationCode')
+      .lean();
+
+    if (!user) return res.status(404).json({ success: false, message: 'User not found' });
+
+    const exportData = {
+      exportDate:    new Date().toISOString(),
+      exportVersion: '1.0',
+      profile: {
+        id:                 String(user._id),
+        name:               user.name,
+        firstName:          user.firstName   || null,
+        lastName:           user.lastName    || null,
+        email:              user.email,
+        phone:              user.phone       || null,
+        gender:             user.gender      || null,
+        dateOfBirth:        user.dateOfBirth || null,
+        age:                user.age         || null,
+        bio:                user.bio         || null,
+        country:            user.country     || null,
+        city:               user.city        || null,
+        avatar:             user.avatar      || null,
+        registrationMethod: user.registrationMethod,
+        createdAt:          user.createdAt,
+        lastActive:         user.lastActive  || null,
+      },
+      verification: {
+        emailVerified:    user.emailVerified,
+        phoneVerified:    user.phoneVerified,
+        profileCompleted: user.profileCompleted,
+      },
+      subscription: {
+        plan:          user.subscription?.plan          || 'free',
+        active:        user.subscription?.active        || false,
+        duration:      user.subscription?.duration      || null,
+        expiresAt:     user.subscription?.expiresAt     || null,
+        paymentMethod: user.subscription?.paymentMethod || null,
+      },
+      preferences: user.preference  || null,
+      photos:      (user.photos || []).map(p => ({ url: p.url, createdAt: p.createdAt })),
+      socialLinks: user.socialLinks || [],
+      consent: {
+        acceptedAt:  user.consentLog?.acceptedAt || null,
+        version:     user.consentLog?.version    || null,
+        withdrawn:   user.consentWithdrawn       || false,
+        withdrawnAt: user.consentWithdrawnAt     || null,
+      },
+      accountStatus: {
+        isScheduledForDeletion: user.isDeleted || false,
+        scheduledDeletionDate:  user.deletedAt || null,
+      },
+    };
+
+    // Generate the beautiful HTML file
+    const htmlContent = generateExportHTML(exportData);
+
+    // Stream it as a downloadable .html file
+    const safeName = (user.name || 'my-data').replace(/[^a-z0-9]/gi, '-').toLowerCase();
+    res.setHeader('Content-Type',        'text/html; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="${safeName}-data-export.html"`);
+    res.setHeader('Content-Length',      Buffer.byteLength(htmlContent, 'utf8'));
+    res.send(htmlContent);
+
+  } catch (error) {
+    console.error('Error exportMyData:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// ==================== GET CONSENT STATUS ====================
+// Used by SettingsScreen on mount to show the correct button state.
+exports.getConsentStatus = async (req, res) => {
+  try {
+    const userId = req.user?.id || req.user?._id;
+    if (!userId) return res.status(401).json({ success: false, message: 'Unauthorized' });
+
+    const user = await User.findById(userId).select('consentWithdrawn consentWithdrawnAt');
+    if (!user) return res.status(404).json({ success: false, message: 'User not found' });
+
+    res.json({
+      success:          true,
+      consentWithdrawn: user.consentWithdrawn   || false,
+      withdrawnAt:      user.consentWithdrawnAt || null,
+    });
+  } catch (error) {
+    console.error('Error getConsentStatus:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// ==================== WITHDRAW CONSENT ====================
+exports.withdrawConsent = async (req, res) => {
+  try {
+    const userId = req.user?.id || req.user?._id;
+    if (!userId) return res.status(401).json({ success: false, message: 'Unauthorized' });
+
+    const user = await User.findById(userId);
+    if (!user) return res.status(404).json({ success: false, message: 'User not found' });
+
+    if (user.consentWithdrawn) {
+      return res.json({
+        success:          true,
+        consentWithdrawn: true,
+        message:          'Consent was already withdrawn.',
+        withdrawnAt:      user.consentWithdrawnAt,
+      });
+    }
+
+    const now = new Date();
+    await User.findByIdAndUpdate(userId, {
+      consentWithdrawn:   true,
+      consentWithdrawnAt: now,
+    });
+
+    res.json({
+      success:          true,
+      consentWithdrawn: true,
+      withdrawnAt:      now,
+      message:          'Your consent has been withdrawn. Your data will no longer be used for profiling or recommendations.',
+    });
+  } catch (error) {
+    console.error('Error withdrawConsent:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// ==================== CANCEL CONSENT WITHDRAWAL (NEW) ====================
+exports.cancelWithdrawConsent = async (req, res) => {
+  try {
+    const userId = req.user?.id || req.user?._id;
+    if (!userId) return res.status(401).json({ success: false, message: 'Unauthorized' });
+
+    const user = await User.findById(userId);
+    if (!user) return res.status(404).json({ success: false, message: 'User not found' });
+
+    if (!user.consentWithdrawn) {
+      return res.json({
+        success:          true,
+        consentWithdrawn: false,
+        message:          'Consent is already active — nothing to cancel.',
+      });
+    }
+
+    await User.findByIdAndUpdate(userId, {
+      consentWithdrawn:   false,
+      consentWithdrawnAt: null,
+    });
+
+    res.json({
+      success:          true,
+      consentWithdrawn: false,
+      message:          'Your consent has been restored. Your data will be used to personalise your experience.',
+    });
+  } catch (error) {
+    console.error('Error cancelWithdrawConsent:', error);
+    res.status(500).json({ success: false, message: error.message });
   }
 };
