@@ -205,20 +205,21 @@ exports.login = async (req, res, next) => {
   try {
     const { email, password } = req.body;
 
-    // ── 1. Normal lookup (pre-find middleware excludes soft-deleted users) ──
+    // ── 1. Normal lookup — pre-find hook excludes isDeleted:true ───────────
     let user = await User.findOne({ email });
 
-    // ── 2. User not found — check if they're in the 30-day grace period ────
+    // ── 2. Not found — check grace-period (soft-deleted) account ───────────
     if (!user) {
       const deletedUser = await User.findOne({
         email,
-        isDeleted: true   // explicit value bypasses the pre-find filter
+        isDeleted: true                     // explicit → bypasses pre-find hook
       });
 
       if (deletedUser) {
-        // Still verify the password before revealing account existence
         const ok = await deletedUser.comparePassword(password);
-        if (!ok) return res.status(401).json({ success: false, message: 'Invalid credentials' });
+        if (!ok) {
+          return res.status(401).json({ success: false, message: 'Invalid credentials' });
+        }
 
         const permanentDeletionAt = new Date(
           deletedUser.deletedAt.getTime() + 30 * 24 * 60 * 60 * 1000
@@ -228,12 +229,12 @@ exports.login = async (req, res, next) => {
           Math.ceil((permanentDeletionAt - new Date()) / (1000 * 60 * 60 * 24))
         );
 
-        // Issue a normal token so the user can call /account/restore
         const token = signToken(deletedUser._id);
 
         return res.json({
+          success: true,                           // ← consistent flag
+          accountScheduledForDeletion: true,       // ← mobile app reads this
           token,
-          accountScheduledForDeletion: true,   // ← frontend reads this flag
           daysRemaining,
           permanentDeletionAt,
           message: `Your account is scheduled for deletion in ${daysRemaining} day(s). You can restore it from Settings.`,
@@ -250,12 +251,17 @@ exports.login = async (req, res, next) => {
       return res.status(401).json({ success: false, message: 'Invalid credentials' });
     }
 
-    // ── 3. Normal login ──────────────────────────────────────────────────────
+    // ── 3. Normal login ─────────────────────────────────────────────────────
     const ok = await user.comparePassword(password);
-    if (!ok) return res.status(401).json({ success: false, message: 'Invalid credentials' });
+    if (!ok) {
+      return res.status(401).json({ success: false, message: 'Invalid credentials' });
+    }
 
     const token = signToken(user._id);
+
+    // ✅ success:true added — admin dashboard and mobile app both rely on this
     res.json({
+      success: true,
       token,
       user: {
         id:            user._id,
@@ -269,6 +275,7 @@ exports.login = async (req, res, next) => {
     next(err);
   }
 };
+
 // ---------------- Other functions ----------------
 
 // Logout: invalidate the token

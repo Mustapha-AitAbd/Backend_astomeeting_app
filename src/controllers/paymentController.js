@@ -94,8 +94,8 @@ exports.createCheckoutSession = async (req, res) => {
         duration: selectedPlan.duration.toString(),
         paymentMethod: 'stripe'
       },
-      success_url: `${API_URL}/payment-success`,
-      cancel_url: `${API_URL}/payment-cancel`,
+      success_url: `https://backendastomeetingapp-production.up.railway.app/payment-success`,
+      cancel_url: `https://backendastomeetingapp-production.up.railway.app/payment-cancel`,
     });
 
     console.log('✅ Stripe session created:', session.id, 'Plan:', planType);
@@ -234,11 +234,11 @@ exports.createPayPalOrder = async (req, res) => {
         }]
       }],
       application_context: {
-        brand_name: 'Your App Name',
+        brand_name: 'Syni',
         landing_page: 'BILLING',
         user_action: 'PAY_NOW',
-        return_url: `${API_URL}/api/payment/paypal/success`,
-        cancel_url: `${API_URL}/payment-cancel`
+        return_url: `https://backendastomeetingapp-production.up.railway.app/api/payment/paypal/success`,
+        cancel_url: `$https://backendastomeetingapp-production.up.railway.app/payment-success`
       }
     });
 
@@ -441,7 +441,7 @@ exports.handlePayPalSuccess = async (req, res) => {
   console.log('📩 PayPal success callback received, token:', token);
   
   // Redirect to success page
-  res.redirect(`${API_URL}/payment-success?provider=paypal&orderId=${token}`);
+  res.redirect(`https://backendastomeetingapp-production.up.railway.app/payment-success?provider=paypal&orderId=${token}`);
 };
 
 // ================================

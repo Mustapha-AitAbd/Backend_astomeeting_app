@@ -148,9 +148,11 @@ UserSchema.index({ isDeleted: 1, createdAt: -1 });
 // and this middleware will leave it untouched.
 ['find', 'findOne', 'findOneAndUpdate', 'countDocuments'].forEach(method => {
   UserSchema.pre(method, function () {
-    if (this.getFilter().isDeleted === undefined) {
+    const filter = this.getFilter();
+    if (!Object.prototype.hasOwnProperty.call(filter, 'isDeleted')) {
       this.where({ isDeleted: { $ne: true } });
     }
+    // If isDeleted is already in the filter (any value), leave the query untouched.
   });
 });
 
