@@ -40,7 +40,7 @@ router.post('/password-reset', passwordReset);
 
 // Google login
 router.post('/google', googleSignIn);
-router.get('/test-google-setup', testGoogleSetup);
+
 
 // ==================== PROTECTED ROUTES ====================
 // ✅ Complete profile (requires authentication)
