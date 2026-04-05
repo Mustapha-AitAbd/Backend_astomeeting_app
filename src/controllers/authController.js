@@ -543,6 +543,7 @@ exports.completeProfile = async (req, res) => {
       gender,
       name: `${firstName} ${lastName}`,
       profileCompleted: true,
+      hasCompletedProfile: true,
     };
 
     // ── NEW: conditionally persist city ───────────────────────────────────

@@ -69,6 +69,7 @@ const UserSchema = new mongoose.Schema({
     default: null,
   },
   profileCompleted:         { type: Boolean, default: false },
+  hasCompletedProfile:      { type: Boolean, default: false },
   phoneVerified:            { type: Boolean, default: false },
   phoneVerificationCode:    { type: String },
   phoneVerificationExpires: { type: Date },

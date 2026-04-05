@@ -60,7 +60,8 @@ const buildResponse = (res, user, isNewUser) => {
   const token = signToken(user._id)
 
   // Un user est "nouveau" s'il vient d'être créé OU si son profil n'est pas complet
-  const needsProfileCompletion = isNewUser || !user.hasCompletedProfile
+  const needsProfileCompletion = isNewUser || 
+  (!user.hasCompletedProfile && !user.profileCompleted);
 
   return res.status(200).json({
     success: true,
