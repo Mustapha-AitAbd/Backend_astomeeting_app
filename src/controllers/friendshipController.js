@@ -25,14 +25,19 @@ exports.sendFriendRequest = async (req, res) => {
       ]
     });
 
-    if (existingRequest) {
-      if (existingRequest.status === "accepted") {
-        return res.status(400).json({ message: "You are already friends" });
+      if (existingRequest) {
+        if (existingRequest.status === "accepted") {
+          return res.status(400).json({ message: "You are already friends" });
+        }
+
+        if (existingRequest.status === "pending") {
+          // 🔥 RENVOYER L'OBJET AU LIEU D'ERREUR
+          return res.status(200).json({ 
+            message: "Already exists",
+            friendship: existingRequest
+          });
+        }
       }
-      if (existingRequest.status === "pending") {
-        return res.status(400).json({ message: "Invitation already sent" });
-      }
-    }
 
     // Créer la nouvelle demande
     const friendship = new Friendship({
