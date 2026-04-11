@@ -32,6 +32,11 @@ const upsertGoogleUser = async ({ googleId, email, name, picture, email_verified
     isNewUser = true
     const randomPassword = await bcrypt.hash(googleId + process.env.JWT_SECRET, 10)
 
+    // ✅ 6 mois de premium automatique dès l'inscription
+    const premiumStartedAt = new Date()
+    const premiumExpiresAt = new Date(premiumStartedAt)
+    premiumExpiresAt.setMonth(premiumExpiresAt.getMonth() + 6)
+
     user = await User.create({
       googleId,
       name:          name || email.split('@')[0],
@@ -43,7 +48,17 @@ const upsertGoogleUser = async ({ googleId, email, name, picture, email_verified
       dateOfBirth:   new Date('2000-01-01'),
       gender:        'other',
       phoneVerified: false,
+
+      // ✅ Même logique que le register email
+      subscription: {
+        plan:      'premium',
+        active:    true,
+        expiresAt: premiumExpiresAt,
+        duration:  '6months',
+      },
     })
+
+    console.log(`[SUBSCRIPTION] Google user ${user.email} granted premium until ${premiumExpiresAt.toISOString()}`)
   }
 
   return { user, isNewUser }
@@ -59,14 +74,13 @@ const upsertGoogleUser = async ({ googleId, email, name, picture, email_verified
 const buildResponse = (res, user, isNewUser) => {
   const token = signToken(user._id)
 
-  // Un user est "nouveau" s'il vient d'être créé OU si son profil n'est pas complet
-  const needsProfileCompletion = isNewUser || 
-  (!user.hasCompletedProfile && !user.profileCompleted);
+  const needsProfileCompletion = isNewUser ||
+    (!user.hasCompletedProfile && !user.profileCompleted)
 
   return res.status(200).json({
     success: true,
     token,
-    needsProfileCompletion,   // ← clé de la séparation Login / Register
+    needsProfileCompletion,
     user: {
       id:                  user._id.toString(),
       name:                user.name,
@@ -76,6 +90,12 @@ const buildResponse = (res, user, isNewUser) => {
       provider:            user.provider,
       isPremium:           user.isPremium           || false,
       hasCompletedProfile: user.hasCompletedProfile || false,
+      // ✅ Ajouté
+      subscription: {
+        plan:      user.subscription?.plan,
+        active:    user.subscription?.active,
+        expiresAt: user.subscription?.expiresAt,
+      },
     },
   })
 }

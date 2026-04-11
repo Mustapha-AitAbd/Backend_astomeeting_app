@@ -16,12 +16,10 @@ exports.register = async (req, res, next) => {
   try {
     const { name, email, password, dateOfBirth, gender, disclaimerAccepted } = req.body;
 
-    // Validation de base
     if (!email || !password) {
       return res.status(400).json({ message: 'Email and password are required' });
     }
 
-    // ✅ Consent validation — required for compliance
     if (!disclaimerAccepted) {
       return res.status(400).json({ message: 'You must accept the Terms and Conditions to register' });
     }
@@ -29,22 +27,22 @@ exports.register = async (req, res, next) => {
     const exists = await User.findOne({ email });
     if (exists) return res.status(400).json({ message: 'Email already used' });
 
-    // ✅ Extract IP address from request
-    // Handles proxies (nginx, load balancers) via x-forwarded-for header
     const rawIp =
       req.headers['x-forwarded-for']?.split(',')[0]?.trim() ||
       req.headers['x-real-ip'] ||
       req.socket?.remoteAddress ||
       'unknown';
 
-    // Normalize IPv6 loopback to readable IPv4
     const ipAddress = rawIp === '::1' ? '127.0.0.1' : rawIp;
-
-    // ✅ Extract User-Agent for device fingerprinting
     const userAgent = req.headers['user-agent'] || 'unknown';
 
-    // Generate 6-digit verification code
     const verificationCode = Math.floor(100000 + Math.random() * 900000).toString();
+
+    // ── Trial: 6 months premium starting now ─────────────────────────────
+    const premiumStartedAt = new Date();
+    const premiumExpiresAt = new Date(premiumStartedAt);
+    premiumExpiresAt.setMonth(premiumExpiresAt.getMonth() + 6);
+    // ─────────────────────────────────────────────────────────────────────
 
     const userData = {
       email,
@@ -53,22 +51,30 @@ exports.register = async (req, res, next) => {
       dateOfBirth: dateOfBirth || new Date('2000-01-01'),
       gender: gender || 'other',
       emailVerificationCode: verificationCode,
-      emailVerificationExpires: Date.now() + 3600000, // 1 hour
+      emailVerificationExpires: Date.now() + 3600000,
       emailVerified: false,
 
-      // ✅ Store full consent audit trail
       consentLog: {
-        acceptedAt: new Date(),       // Server-side timestamp (trustworthy)
+        acceptedAt: new Date(),
         ipAddress,
         userAgent,
-        version: '1.0',               // Bump this when T&C change
+        version: '1.0',
+      },
+
+      // ✅ Every new user starts with 6 months of premium automatically
+      subscription: {
+        plan:      'premium',
+        active:    true,
+        expiresAt: premiumExpiresAt,
+        duration:  '6months',
       },
     };
 
     const user = await User.create(userData);
     const token = signToken(user._id);
 
-    // Send verification email (unchanged)
+    console.log(`[SUBSCRIPTION] User ${user.email} granted premium until ${premiumExpiresAt.toISOString()}`);
+
     try {
       await transporter.sendMail({
         from: process.env.EMAIL_USER,
@@ -93,16 +99,20 @@ exports.register = async (req, res, next) => {
       console.error('Failed to send verification email:', emailError);
     }
 
-    // ✅ Log for server-side audit trail
     console.log(`[CONSENT] User ${user.email} accepted T&C at ${userData.consentLog.acceptedAt.toISOString()} from IP ${ipAddress}`);
 
     res.status(201).json({
       token,
       user: {
-        id: user._id,
-        name: user.name,
-        email: user.email,
+        id:           user._id,
+        name:         user.name,
+        email:        user.email,
         emailVerified: user.emailVerified,
+        subscription: {
+          plan:      user.subscription.plan,
+          active:    user.subscription.active,
+          expiresAt: user.subscription.expiresAt,
+        },
       },
       message: 'Registration successful. Please check your email for verification code.',
     });
