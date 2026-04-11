@@ -12,6 +12,7 @@ const signToken = (id) =>
 let blacklistedTokens = new Set();
 
 // ============= REGISTER WITH EMAIL VERIFICATION =============
+// ============= REGISTER WITH EMAIL VERIFICATION =============
 exports.register = async (req, res, next) => {
   try {
     const { name, email, password, dateOfBirth, gender, disclaimerAccepted } = req.body;
@@ -76,8 +77,8 @@ exports.register = async (req, res, next) => {
     console.log(`[SUBSCRIPTION] User ${user.email} granted premium until ${premiumExpiresAt.toISOString()}`);
 
     try {
-      await transporter.emails.send({
-        from: 'Syni App <onboarding@resend.dev>',
+      await transporter.sendMail({
+        from: process.env.EMAIL_USER,
         to: user.email,
         subject: 'Verify Your Email - Syni App',
         html: `
@@ -187,8 +188,8 @@ exports.resendVerificationCode = async (req, res, next) => {
     await user.save();
 
     // Send new verification email
-    await transporter.emails.send({
-      from: 'Syni App <onboarding@resend.dev>',
+    await transporter.sendMail({
+      from: process.env.EMAIL_USER,
       to: user.email,
       subject: 'New Verification Code - Syni App',
       html: `
@@ -405,8 +406,8 @@ exports.passwordResetRequest = async (req, res, next) => {
     await user.save();
 
     // Send email
-    await transporter.emails.send({
-      from: 'Syni App <onboarding@resend.dev>',
+    await transporter.sendMail({
+      from: process.env.EMAIL_USER,
       to: user.email,
       subject: 'Password Reset Code',
       text: `Your password reset code is: ${resetCode}. It will expire in 1 hour.`,
