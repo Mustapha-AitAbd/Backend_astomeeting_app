@@ -78,7 +78,7 @@ exports.register = async (req, res, next) => {
 
     try {
       await transporter.sendMail({
-        from: process.env.EMAIL_USER,
+        
         to: user.email,
         subject: 'Verify Your Email - Syni App',
         html: `
@@ -189,7 +189,7 @@ exports.resendVerificationCode = async (req, res, next) => {
 
     // Send new verification email
     await transporter.sendMail({
-      from: process.env.EMAIL_USER,
+      
       to: user.email,
       subject: 'New Verification Code - Syni App',
       html: `
@@ -407,7 +407,7 @@ exports.passwordResetRequest = async (req, res, next) => {
 
     // Send email
     await transporter.sendMail({
-      from: process.env.EMAIL_USER,
+      
       to: user.email,
       subject: 'Password Reset Code',
       text: `Your password reset code is: ${resetCode}. It will expire in 1 hour.`,
