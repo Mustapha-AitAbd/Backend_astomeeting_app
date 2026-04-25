@@ -76,6 +76,31 @@ app.get('/test-admin', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'test_admin.html'));
 });
 
+app.get('/delete-account', (req, res) => {
+  res.send(`
+    <html>
+      <head><title>Delete Account - Syni</title></head>
+      <body>
+        <h1>Delete Your Syni Account</h1>
+        <p>To delete your account:</p>
+        <ol>
+          <li>Open the Syni app</li>
+          <li>Go to Settings</li>
+          <li>Tap "Delete Account"</li>
+        </ol>
+
+        <p><strong>Important:</strong></p>
+        <ul>
+          <li>Account deleted after 30 days</li>
+          <li>You can cancel anytime before</li>
+        </ul>
+
+        <p>All personal data will be permanently deleted after this period.</p>
+      </body>
+    </html>
+  `)
+})
+
 // ✅ Routes pour les pages HTML de paiement
 app.get('/payment-success', (req, res) => {
   console.log('📄 Serving payment-success page');
