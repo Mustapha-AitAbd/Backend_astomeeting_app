@@ -76,6 +76,10 @@ app.get('/test-admin', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'test_admin.html'));
 });
 
+app.get('/support', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'support.html'));
+});
+
 app.get('/delete-account', (req, res) => {
   res.send(`
     <html>
