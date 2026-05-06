@@ -12,23 +12,49 @@ const signToken = (id) =>
 
 // ═══════════════════════════════════════════════════════════════════════
 // Helper : créer ou mettre à jour un utilisateur Google en base
+//
+// Retourne :
+//   { user, isNewUser, isScheduledForDeletion }
+//
+// isScheduledForDeletion === true  →  compte trouvé mais soft-deleted
+//   → NE PAS compléter la connexion
+//   → retourner accountScheduledForDeletion au client
 // ═══════════════════════════════════════════════════════════════════════
 const upsertGoogleUser = async ({ googleId, email, name, picture, email_verified }) => {
+
+  // ── Étape 1 : lookup normal (le pre-find hook exclut isDeleted:true) ───
   let user = await User.findOne({
     $or: [{ googleId }, { email: email.toLowerCase() }],
   })
 
+  // ── Étape 2 : si rien trouvé, vérifier les comptes soft-deleted ────────
+  // On passe isDeleted:true explicitement pour contourner le pre-find hook.
+  // Miroir exact du bloc grace-period dans authController.js → login().
+  if (!user) {
+    const deletedUser = await User.findOne({
+      $or: [{ googleId }, { email: email.toLowerCase() }],
+      isDeleted: true,                      // ← bypass pre-find hook
+    })
+
+    if (deletedUser) {
+      // Ne pas modifier le compte ici.
+      // On laisse googleSignIn retourner accountScheduledForDeletion
+      // pour que le frontend affiche la dialog de restauration.
+      return { user: deletedUser, isNewUser: false, isScheduledForDeletion: true }
+    }
+  }
+
   let isNewUser = false
 
   if (user) {
-    // ── Utilisateur existant : compléter les champs manquants ────────────
+    // ── Utilisateur actif existant : compléter les champs manquants ───────
     if (!user.googleId)                        user.googleId      = googleId
     if (!user.avatar && picture)               user.avatar        = picture
     if (!user.emailVerified && email_verified) user.emailVerified = true
     if (user.provider !== 'google')            user.provider      = 'google'
     await user.save()
   } else {
-    // ── Nouvel utilisateur : créer le compte ─────────────────────────────
+    // ── Nouvel utilisateur : créer le compte ──────────────────────────────
     isNewUser = true
     const randomPassword = await bcrypt.hash(googleId + process.env.JWT_SECRET, 10)
 
@@ -61,11 +87,11 @@ const upsertGoogleUser = async ({ googleId, email, name, picture, email_verified
     console.log(`[SUBSCRIPTION] Google user ${user.email} granted premium until ${premiumExpiresAt.toISOString()}`)
   }
 
-  return { user, isNewUser }
+  return { user, isNewUser, isScheduledForDeletion: false }
 }
 
 // ═══════════════════════════════════════════════════════════════════════
-// Helper : construire la réponse finale
+// Helper : réponse de connexion réussie
 //
 // needsProfileCompletion contrôle la navigation côté client :
 //   true  → Nouvel utilisateur → RegisterStep3
@@ -90,12 +116,53 @@ const buildResponse = (res, user, isNewUser) => {
       provider:            user.provider,
       isPremium:           user.isPremium           || false,
       hasCompletedProfile: user.hasCompletedProfile || false,
-      // ✅ Ajouté
       subscription: {
         plan:      user.subscription?.plan,
         active:    user.subscription?.active,
         expiresAt: user.subscription?.expiresAt,
       },
+    },
+  })
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// Helper : réponse "compte en attente de suppression"
+//
+// Produit exactement le même shape JSON que authController.js → login()
+// pour les comptes soft-deleted, afin que le frontend puisse réutiliser
+// le même dialog de restauration sans modification.
+//
+// Contrat frontend :
+//   1. Détecter accountScheduledForDeletion === true
+//   2. Afficher la dialog de confirmation de restauration
+//   3a. Utilisateur confirme → POST /api/auth/cancel-account-deletion
+//       avec le token retourné → naviguer vers Home
+//   3b. Utilisateur refuse   → appeler logout, rester sur l'écran de connexion
+// ═══════════════════════════════════════════════════════════════════════
+const buildDeletionResponse = (res, user) => {
+  const token = signToken(user._id)
+
+  const permanentDeletionAt = new Date(
+    user.deletedAt.getTime() + 30 * 24 * 60 * 60 * 1000
+  )
+  const daysRemaining = Math.max(
+    0,
+    Math.ceil((permanentDeletionAt - new Date()) / (1000 * 60 * 60 * 24))
+  )
+
+  return res.status(200).json({
+    success:                     true,
+    accountScheduledForDeletion: true,       // ← clé lue par le frontend
+    token,
+    daysRemaining,
+    permanentDeletionAt,
+    message: `Your account is scheduled for deletion in ${daysRemaining} day(s). You can restore it from Settings.`,
+    user: {
+      id:            user._id.toString(),
+      name:          user.name,
+      email:         user.email,
+      emailVerified: user.emailVerified,
+      role:          user.role,
     },
   })
 }
@@ -107,9 +174,10 @@ const buildResponse = (res, user, isNewUser) => {
 //   1. { idToken }                  → flux principal (sécurisé)
 //   2. { accessToken, userInfo }    → flux fallback (quand idToken absent)
 //
-// Résultat :
-//   - needsProfileCompletion: false → user existant → navigate Home
-//   - needsProfileCompletion: true  → nouvel user   → navigate RegisterStep3
+// Résultats possibles :
+//   needsProfileCompletion: false        → user existant  → navigate Home
+//   needsProfileCompletion: true         → nouvel user    → navigate RegisterStep3
+//   accountScheduledForDeletion: true    → compte supprimé → dialog restauration
 // ═══════════════════════════════════════════════════════════════════════
 exports.googleSignIn = async (req, res) => {
   try {
@@ -117,8 +185,6 @@ exports.googleSignIn = async (req, res) => {
 
     // ── Flux 1 : idToken (préféré) ────────────────────────────────────────
     if (idToken) {
-      // ✅ Accepter les tokens émis par n'importe lequel des clients Google de l'app
-      // (Web, Android, iOS peuvent chacun émettre un idToken avec leur propre client_id)
       const validAudiences = [
         process.env.GOOGLE_WEB_CLIENT_ID,
         process.env.GOOGLE_ANDROID_CLIENT_ID,
@@ -134,7 +200,7 @@ exports.googleSignIn = async (req, res) => {
       try {
         const ticket = await client.verifyIdToken({
           idToken,
-          audience: validAudiences,   // ✅ tableau — accepte Web, Android et iOS
+          audience: validAudiences,         // ✅ tableau — accepte Web, Android et iOS
         })
         payload = ticket.getPayload()
       } catch (verifyErr) {
@@ -162,7 +228,7 @@ exports.googleSignIn = async (req, res) => {
         return res.status(400).json({ message: 'Impossible de récupérer l\'email depuis Google' })
       }
 
-      const { user, isNewUser } = await upsertGoogleUser({
+      const { user, isNewUser, isScheduledForDeletion } = await upsertGoogleUser({
         googleId,
         email,
         name: name || given_name,
@@ -170,12 +236,16 @@ exports.googleSignIn = async (req, res) => {
         email_verified,
       })
 
+      // ── Verrou compte supprimé ────────────────────────────────────────────
+      if (isScheduledForDeletion) {
+        return buildDeletionResponse(res, user)
+      }
+
       return buildResponse(res, user, isNewUser)
     }
 
     // ── Flux 2 : accessToken + userInfo (fallback) ────────────────────────
     if (accessToken && userInfo) {
-      // Valider le accessToken auprès de Google
       const tokenInfoRes = await fetch(
         `https://www.googleapis.com/oauth2/v3/tokeninfo?access_token=${accessToken}`
       )
@@ -186,7 +256,6 @@ exports.googleSignIn = async (req, res) => {
         return res.status(401).json({ message: 'Token Google invalide' })
       }
 
-      // Vérifier que le token appartient bien à notre application
       const validAudiences = [
         process.env.GOOGLE_WEB_CLIENT_ID,
         process.env.GOOGLE_ANDROID_CLIENT_ID,
@@ -204,13 +273,18 @@ exports.googleSignIn = async (req, res) => {
         return res.status(400).json({ message: 'Impossible de récupérer l\'email depuis Google' })
       }
 
-      const { user, isNewUser } = await upsertGoogleUser({
+      const { user, isNewUser, isScheduledForDeletion } = await upsertGoogleUser({
         googleId: googleId || tokenInfo.sub,
         email,
         name,
         picture,
         email_verified: true,
       })
+
+      // ── Verrou compte supprimé ────────────────────────────────────────────
+      if (isScheduledForDeletion) {
+        return buildDeletionResponse(res, user)
+      }
 
       return buildResponse(res, user, isNewUser)
     }
