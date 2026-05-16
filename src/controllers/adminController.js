@@ -922,16 +922,16 @@ exports.requestAccountDeletion = async (req, res) => {
         success: false,
         message: 'Account is already scheduled for deletion',
         deletedAt: user.deletedAt,
-        permanentDeletionAt
+        permanentDeletionAt,
       });
     }
 
-    // Cancel active Stripe subscriptions immediately
+    // Cancel active Stripe subscriptions (real payment provider — must cancel)
     if (user.subscription?.stripeCustomerId) {
       try {
         const subs = await stripe.subscriptions.list({
           customer: user.subscription.stripeCustomerId,
-          status: 'active'
+          status: 'active',
         });
         for (const sub of subs.data) {
           await stripe.subscriptions.cancel(sub.id);
@@ -944,16 +944,13 @@ exports.requestAccountDeletion = async (req, res) => {
     const now = new Date();
     const permanentDeletionAt = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
 
-    // NOTE: findByIdAndUpdate bypasses pre-save hooks but NOT pre-find hooks.
-    // We use it directly here — it will find the user because at this point
-    // isDeleted is still false, which passes the pre-find filter.
     await User.findByIdAndUpdate(userId, {
-      isDeleted:             true,
-      deletedAt:             now,
-      consentWithdrawn:      true,
-      consentWithdrawnAt:    now,
-      'subscription.active': false,
-      'subscription.plan':   'free',
+      isDeleted:          true,
+      deletedAt:          now,
+      consentWithdrawn:   true,
+      consentWithdrawnAt: now,
+      // ✅ DO NOT touch subscription.plan / subscription.active here.
+      // The original expiresAt is preserved so restoration can check it.
     });
 
     res.json({
@@ -963,9 +960,6 @@ exports.requestAccountDeletion = async (req, res) => {
       permanentDeletionAt,
       daysRemaining: 30,
     });
-    // ⚠️  Frontend should NOT call logout() here.
-    // The user stays logged in with their token for 30 days
-    // so they can restore their account from the settings screen.
   } catch (error) {
     console.error('Error requestAccountDeletion:', error);
     res.status(500).json({ success: false, message: error.message });
@@ -978,12 +972,9 @@ exports.cancelAccountDeletion = async (req, res) => {
     const userId = req.user?.id || req.user?._id;
     if (!userId) return res.status(401).json({ success: false, message: 'Unauthorized' });
 
-    // IMPORTANT: pass isDeleted:true explicitly so the pre-find middleware
-    // does NOT exclude this document from the query.
     const user = await User.findOne({ _id: userId, isDeleted: true });
 
     if (!user) {
-      // Either doesn't exist, or wasn't deleted at all
       const exists = await User.findById(userId);
       if (!exists) return res.status(404).json({ success: false, message: 'User not found' });
       return res.status(400).json({ success: false, message: 'Account is not scheduled for deletion' });
@@ -995,12 +986,29 @@ exports.cancelAccountDeletion = async (req, res) => {
     if (new Date() > gracePeriodEnd) {
       return res.status(400).json({
         success: false,
-        message: 'Grace period has expired. Account cannot be restored.'
+        message: 'Grace period has expired. Account cannot be restored.',
       });
     }
 
-    // Restore — use updateOne with the explicit filter so the pre-find hook
-    // doesn't interfere.
+    // ✅ Determine whether the original premium subscription is still valid.
+    // The expiresAt was preserved during soft-delete, so we just check it.
+    const now = new Date();
+    const premiumStillValid =
+      user.subscription?.expiresAt &&
+      new Date(user.subscription.expiresAt) > now;
+
+    const subscriptionRestore = premiumStillValid
+      ? {
+          'subscription.plan':   'premium',
+          'subscription.active': true,
+          // expiresAt already correct in DB — no change needed
+        }
+      : {
+          // Premium genuinely expired during the grace window — stay on free
+          'subscription.plan':   'free',
+          'subscription.active': false,
+        };
+
     await User.updateOne(
       { _id: userId, isDeleted: true },
       {
@@ -1009,17 +1017,29 @@ exports.cancelAccountDeletion = async (req, res) => {
           deletedAt:          null,
           consentWithdrawn:   false,
           consentWithdrawnAt: null,
-        }
+          ...subscriptionRestore,  // ✅ restore subscription to its real state
+        },
       }
     );
 
-    res.json({ success: true, message: 'Account deletion cancelled successfully. Your account has been restored.' });
+    const message = premiumStillValid
+      ? 'Account restored successfully. Your Premium subscription is still active.'
+      : 'Account restored successfully. Your Premium subscription had expired.';
+
+    res.json({
+      success: true,
+      message,
+      subscription: {
+        plan:      premiumStillValid ? 'premium' : 'free',
+        active:    premiumStillValid,
+        expiresAt: user.subscription?.expiresAt ?? null,
+      },
+    });
   } catch (error) {
     console.error('Error cancelAccountDeletion:', error);
     res.status(500).json({ success: false, message: error.message });
   }
 };
-
 // ==================== GET MY DELETION STATUS ====================
 exports.getDeletionStatus = async (req, res) => {
   try {
