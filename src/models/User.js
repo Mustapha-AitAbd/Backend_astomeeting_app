@@ -51,7 +51,7 @@ const SocialLinkSchema = new mongoose.Schema({
 // ─── Main User schema ─────────────────────────────────────────────────────────
 const UserSchema = new mongoose.Schema({
   phone:              { type: String },
-  registrationMethod: { type: String, enum: ['email', 'google', 'phone'], default: 'email' },
+  registrationMethod: { type: String, enum: ['email', 'google', 'phone', 'apple'], default: 'email' },
   firstName:          { type: String },
   lastName:           { type: String },
   bio: {
@@ -74,6 +74,7 @@ const UserSchema = new mongoose.Schema({
   phoneVerificationCode:    { type: String },
   phoneVerificationExpires: { type: Date },
   googleId: { type: String },
+  appleId:  { type: String }, 
   name:     { type: String, required: true },
   email:    { type: String, required: true, unique: true, lowercase: true },
   password: { type: String },
@@ -95,7 +96,7 @@ const UserSchema = new mongoose.Schema({
   emailVerified:           { type: Boolean, default: false },
   emailVerificationCode:   String,
   emailVerificationExpires: Date,
-  provider:    { type: String, enum: ['local', 'google'], default: 'local' },
+  provider: { type: String, enum: ['local', 'google', 'apple'], default: 'local' },
   createdAt:   { type: Date, default: Date.now },
   lastActive:  Date,
   resetPasswordCode:    { type: String },
