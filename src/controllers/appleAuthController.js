@@ -36,20 +36,27 @@ exports.appleSignIn = async (req, res, next) => {
     }
 
     // ── 1. Verify the identity token with Apple ──────────────────────────────
-    let applePayload;
-    try {
-      applePayload = await appleSignin.verifyIdToken(identityToken, {
-        // audience must match what you sent the token to
-        audience:        process.env.APPLE_BUNDLE_ID,
-        ignoreExpiration: false,
-      });
-    } catch (verifyError) {
-      console.error('[Apple Auth] Token verification failed:', verifyError.message);
-      return res.status(401).json({
-        success: false,
-        message: 'Invalid or expired Apple identity token',
-      });
-    }
+let applePayload;
+try {
+  applePayload = await appleSignin.verifyIdToken(identityToken, {
+    audience: [
+      process.env.APPLE_BUNDLE_ID,                          // com.mustapha11.syni
+      process.env.APPLE_CLIENT_ID,                          // com.com.mustapha11.syni.signin
+    ],
+    ignoreExpiration: false,
+  });
+} catch (verifyError) {
+  console.error('[Apple Auth] Token verification failed:', verifyError.message);
+  
+  // ── DEBUG: decode the token to see what audience Apple actually sent ──
+  const decoded = require('jsonwebtoken').decode(identityToken);
+  console.error('[Apple Auth] Token payload (decoded, unverified):', JSON.stringify(decoded, null, 2));
+  
+  return res.status(401).json({
+    success: false,
+    message: 'Invalid or expired Apple identity token',
+  });
+}
 
     const appleId = applePayload.sub; // Apple's stable user identifier
     const emailFromToken = applePayload.email || null;
